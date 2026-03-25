@@ -1,0 +1,20 @@
+# User Secrets
+**/secrets.json
+**/user-secrets-id
+
+# Configs sensíveis
+appsettings.Development.json
+appsettings.json
+
+# Arquivos gerados
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+
+# Banco de dados
+*.db
+*.db-shm
+*.db-wal
+
