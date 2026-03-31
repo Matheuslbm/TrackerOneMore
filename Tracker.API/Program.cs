@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Tracker.Infrastructure.Data;
+using Tracker.Application;
+using Tracker.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +10,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddApplicationServices();
+builder.Services.AddInfrastructureServices();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
