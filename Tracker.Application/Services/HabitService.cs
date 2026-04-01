@@ -41,11 +41,16 @@ public class HabitService : IHabitService
 
     public async Task<HabitResponse> LogHabitAsync(
         Guid habitId,
+        Guid userId,
         LogHabitRequest request,
         CancellationToken cancellationToken = default)
     {
         var habit = await _habitRepository.GetByIdAsync(habitId, cancellationToken)
             ?? throw new HabitNotFoundException(habitId);
+
+        // 🔐 SEGURANÇA: Validar que o hábito pertence ao usuário autenticado
+        if (habit.UserId != userId)
+            throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
 
         var existingLog = await _habitLogRepository.GetLogByDateAsync(habitId, request.Date, cancellationToken);
 
@@ -63,6 +68,41 @@ public class HabitService : IHabitService
         var updatedStreak = await CalculateCurrentStreakAsync(habitId, cancellationToken);
 
         return MapHabitToResponse(habit, updatedStreak);
+    }
+
+    public async Task<PagedResponse<HabitResponse>> GetUserHabitsAsync(Guid userId, int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty)
+            throw new ArgumentException("UserId não pode ser vazio.", nameof(userId));
+
+        if (pageNumber < 1)
+            pageNumber = 1;
+
+        if (pageSize < 1 || pageSize > 100)
+            pageSize = 20;
+
+        var habits = await _habitRepository.GetAllByUserIdAsync(userId, cancellationToken);
+        var totalItems = habits.Count();
+
+        var pagedHabits = habits
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        var response = new List<HabitResponse>();
+        foreach (var habit in pagedHabits)
+        {
+            var currentStreak = await CalculateCurrentStreakAsync(habit.Id, cancellationToken);
+            response.Add(MapHabitToResponse(habit, currentStreak));
+        }
+
+        return new PagedResponse<HabitResponse>
+        {
+            Items = response,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalItems = totalItems
+        };
     }
 
     public async Task<int> CalculateCurrentStreakAsync(Guid habitId, CancellationToken cancellationToken = default)
