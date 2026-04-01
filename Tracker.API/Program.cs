@@ -7,6 +7,7 @@ using Tracker.Application;
 using Tracker.Infrastructure;
 using Tracker.Infrastructure.Auth;
 using Tracker.API.Middleware;
+using Tracker.API.Converters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        options.JsonSerializerOptions.Converters.Add(new DateOnlyJsonConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddApplicationServices();

@@ -10,5 +10,7 @@ public class MappingProfile : Profile
     {
         CreateMap<Habit, HabitResponse>();
         CreateMap<User, AuthResponse>();
+        CreateMap<Challenge, ChallengeResponse>();
+        CreateMap<DailyMood, MoodResponse>();
     }
 }

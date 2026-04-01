@@ -12,6 +12,8 @@ public static class DependencyInjection
         services.AddAutoMapper(typeof(MappingProfile));
         services.AddScoped<IHabitService, HabitService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IChallengeService, ChallengeService>();
+        services.AddScoped<IMoodService, MoodService>();
         return services;
     }
 }
