@@ -247,6 +247,95 @@ public class ChallengesController : ControllerBase
             return StatusCode(500, new { error = "Erro ao completar desafio" });
         }
     }
+
+    /// <summary>
+    /// Editar um desafio existente
+    /// </summary>
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof(ChallengeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ChallengeResponse>> UpdateChallenge(
+        Guid id,
+        [FromBody] UpdateChallengeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = User.GetUserId();
+
+            var response = await _challengeService.UpdateChallengeAsync(id, userId, request, cancellationToken);
+
+            _logger.LogInformation(
+                "Desafio {ChallengeId} atualizado pelo usuário {UserId}",
+                id, userId);
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning("Validação falhou ao editar desafio: {Message}", ex.Message);
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Acesso negado ao editar desafio");
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning("Desafio não encontrado: {Message}", ex.Message);
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao editar desafio");
+            return StatusCode(500, new { error = "Erro ao editar desafio" });
+        }
+    }
+
+    /// <summary>
+    /// Deletar um desafio
+    /// </summary>
+    [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteChallenge(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = User.GetUserId();
+
+            await _challengeService.DeleteChallengeAsync(id, userId, cancellationToken);
+
+            _logger.LogInformation(
+                "Desafio {ChallengeId} deletado pelo usuário {UserId}",
+                id, userId);
+
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Acesso negado ao deletar desafio");
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning("Desafio não encontrado: {Message}", ex.Message);
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao deletar desafio");
+            return StatusCode(500, new { error = "Erro ao deletar desafio" });
+        }
+    }
 }
 
 public class ExtendChallengeRequest

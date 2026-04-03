@@ -38,6 +38,25 @@ public class HabitRepository : IHabitRepository
         await SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateAsync(Habit habit, CancellationToken cancellationToken = default)
+    {
+        if (habit == null)
+            throw new ArgumentNullException(nameof(habit));
+
+        _dbContext.Habits.Update(habit);
+        await SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var habit = await _dbContext.Habits.FindAsync(new object[] { id }, cancellationToken);
+        if (habit != null)
+        {
+            _dbContext.Habits.Remove(habit);
+            await SaveChangesAsync(cancellationToken);
+        }
+    }
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -25,4 +25,15 @@ public class Habit : BaseEntity
         TargetDaysPerWeek = targetDaysPerWeek;
         GraceDaysAllowed = graceDaysAllowed;
     }
+
+    /// <summary>
+    /// Atualiza os dados do hábito
+    /// </summary>
+    public void Update(string name, HabitType type, int? targetDaysPerWeek, int graceDaysAllowed)
+    {
+        Name = name;
+        Type = type;
+        TargetDaysPerWeek = targetDaysPerWeek;
+        GraceDaysAllowed = graceDaysAllowed;
+    }
 }

@@ -143,6 +143,52 @@ public class HabitService : IHabitService
         }
     }
 
+    public async Task<HabitResponse> UpdateHabitAsync(
+        Guid habitId,
+        Guid userId,
+        UpdateHabitRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateUpdateHabitRequest(request);
+
+        var habit = await _habitRepository.GetByIdAsync(habitId, cancellationToken)
+            ?? throw new HabitNotFoundException(habitId);
+
+        // 🔐 SEGURANÇA: Validar que o hábito pertence ao usuário autenticado
+        if (habit.UserId != userId)
+            throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
+
+        habit.Update(request.Name, request.Type, request.TargetDaysPerWeek, request.GraceDaysAllowed);
+        await _habitRepository.UpdateAsync(habit, cancellationToken);
+
+        var currentStreak = await CalculateCurrentStreakAsync(habitId, cancellationToken);
+        return MapHabitToResponse(habit, currentStreak);
+    }
+
+    public async Task DeleteHabitAsync(
+        Guid habitId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var habit = await _habitRepository.GetByIdAsync(habitId, cancellationToken)
+            ?? throw new HabitNotFoundException(habitId);
+
+        // 🔐 SEGURANÇA: Validar que o hábito pertence ao usuário autenticado
+        if (habit.UserId != userId)
+            throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
+
+        await _habitRepository.DeleteAsync(habitId, cancellationToken);
+    }
+
+    private static void ValidateUpdateHabitRequest(UpdateHabitRequest request)
+    {
+        if (request.Type == HabitType.WeeklyTarget)
+        {
+            if (request.TargetDaysPerWeek == null || request.TargetDaysPerWeek < 1 || request.TargetDaysPerWeek > 7)
+                throw new ArgumentException("Para hábitos do tipo WeeklyTarget, TargetDaysPerWeek deve ser entre 1 e 7.", nameof(request.TargetDaysPerWeek));
+        }
+    }
+
     private HabitResponse MapHabitToResponse(Habit habit, int currentStreak)
     {
         var response = _mapper.Map<HabitResponse>(habit);

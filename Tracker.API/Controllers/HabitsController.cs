@@ -94,4 +94,60 @@ public class HabitsController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpPut("{habitId:guid}")]
+    public async Task<IActionResult> UpdateHabit(
+        Guid habitId,
+        UpdateHabitRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+
+        try
+        {
+            var response = await _habitService.UpdateHabitAsync(habitId, userId, request, cancellationToken);
+            _logger.LogInformation("Hábito {HabitId} atualizado para usuário {UserId}", habitId, userId);
+            return Ok(response);
+        }
+        catch (HabitNotFoundException ex)
+        {
+            _logger.LogWarning("Hábito não encontrado: {HabitId}", habitId);
+            return NotFound(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Usuário {UserId} tentou atualizar hábito de outro usuário: {HabitId}", userId, habitId);
+            return Forbid();
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning("Validação falhou ao atualizar hábito: {Message}", ex.Message);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpDelete("{habitId:guid}")]
+    public async Task<IActionResult> DeleteHabit(
+        Guid habitId,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+
+        try
+        {
+            await _habitService.DeleteHabitAsync(habitId, userId, cancellationToken);
+            _logger.LogInformation("Hábito {HabitId} deletado para usuário {UserId}", habitId, userId);
+            return NoContent();
+        }
+        catch (HabitNotFoundException ex)
+        {
+            _logger.LogWarning("Hábito não encontrado: {HabitId}", habitId);
+            return NotFound(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Usuário {UserId} tentou deletar hábito de outro usuário: {HabitId}", userId, habitId);
+            return Forbid();
+        }
+    }
 }

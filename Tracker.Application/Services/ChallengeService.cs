@@ -104,6 +104,40 @@ public class ChallengeService : IChallengeService
         return challenge == null ? null : _mapper.Map<ChallengeResponse>(challenge);
     }
 
+    public async Task<ChallengeResponse> UpdateChallengeAsync(
+        Guid challengeId,
+        Guid userId,
+        UpdateChallengeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateUpdateChallengeRequest(request);
+
+        var challenge = await _challengeRepository.GetByIdAsync(challengeId, cancellationToken)
+            ?? throw new InvalidOperationException("Desafio não encontrado.");
+
+        if (challenge.UserId != userId)
+            throw new UnauthorizedAccessException("Você não tem permissão para acessar este desafio.");
+
+        challenge.Update(request.Title);
+        await _challengeRepository.UpdateAsync(challenge, cancellationToken);
+
+        return _mapper.Map<ChallengeResponse>(challenge);
+    }
+
+    public async Task DeleteChallengeAsync(
+        Guid challengeId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var challenge = await _challengeRepository.GetByIdAsync(challengeId, cancellationToken)
+            ?? throw new InvalidOperationException("Desafio não encontrado.");
+
+        if (challenge.UserId != userId)
+            throw new UnauthorizedAccessException("Você não tem permissão para acessar este desafio.");
+
+        await _challengeRepository.DeleteAsync(challengeId, cancellationToken);
+    }
+
     private static void ValidateCreateChallengeRequest(CreateChallengeRequest request)
     {
         if (request == null)
@@ -114,5 +148,14 @@ public class ChallengeService : IChallengeService
 
         if (request.InitialDaysDuration <= 0 || request.InitialDaysDuration > 365)
             throw new ArgumentException("Duração deve estar entre 1 e 365 dias", nameof(request.InitialDaysDuration));
+    }
+
+    private static void ValidateUpdateChallengeRequest(UpdateChallengeRequest request)
+    {
+        if (request == null)
+            throw new ArgumentNullException(nameof(request));
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("Título é obrigatório", nameof(request.Title));
     }
 }

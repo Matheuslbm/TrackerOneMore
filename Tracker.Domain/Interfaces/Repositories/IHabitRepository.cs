@@ -13,7 +13,12 @@ public interface IHabitRepository
     // adicionar um novo hábito.
     Task AddAsync(Habit habit, CancellationToken cancellationToken = default);
 
+    // atualizar um hábito existente.
+    Task UpdateAsync(Habit habit, CancellationToken cancellationToken = default);
+
+    // deletar um hábito.
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
     // salva toda alteações no banco de dados.
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
-
 }
