@@ -30,7 +30,8 @@ public class ChallengeService : IChallengeService
 
         await _challengeRepository.AddAsync(challenge, cancellationToken);
 
-        return _mapper.Map<ChallengeResponse>(challenge);
+        var currentStreak = await CalculateCurrentStreakAsync(challenge.Id, cancellationToken);
+        return MapChallengeToResponse(challenge, currentStreak);
     }
 
     public async Task LogDailyChallengeAsync(Guid userId, Guid challengeId, LogChallengeRequest request, CancellationToken cancellationToken = default)
@@ -93,7 +94,15 @@ public class ChallengeService : IChallengeService
         CancellationToken cancellationToken = default)
     {
         var challenges = await _challengeRepository.GetActiveChallengesByUserIdAsync(userId, cancellationToken);
-        return _mapper.Map<IEnumerable<ChallengeResponse>>(challenges);
+
+        var response = new List<ChallengeResponse>();
+        foreach (var challenge in challenges)
+        {
+            var currentStreak = await CalculateCurrentStreakAsync(challenge.Id, cancellationToken);
+            response.Add(MapChallengeToResponse(challenge, currentStreak));
+        }
+
+        return response;
     }
 
     public async Task<ChallengeResponse?> GetChallengeAsync(
@@ -101,7 +110,11 @@ public class ChallengeService : IChallengeService
         CancellationToken cancellationToken = default)
     {
         var challenge = await _challengeRepository.GetByIdAsync(challengeId, cancellationToken);
-        return challenge == null ? null : _mapper.Map<ChallengeResponse>(challenge);
+        if (challenge == null)
+            return null;
+
+        var currentStreak = await CalculateCurrentStreakAsync(challengeId, cancellationToken);
+        return MapChallengeToResponse(challenge, currentStreak);
     }
 
     public async Task<ChallengeResponse> UpdateChallengeAsync(
@@ -121,7 +134,8 @@ public class ChallengeService : IChallengeService
         challenge.Update(request.Title);
         await _challengeRepository.UpdateAsync(challenge, cancellationToken);
 
-        return _mapper.Map<ChallengeResponse>(challenge);
+        var currentStreak = await CalculateCurrentStreakAsync(challengeId, cancellationToken);
+        return MapChallengeToResponse(challenge, currentStreak);
     }
 
     public async Task DeleteChallengeAsync(
@@ -157,5 +171,54 @@ public class ChallengeService : IChallengeService
 
         if (string.IsNullOrWhiteSpace(request.Title))
             throw new ArgumentException("Título é obrigatório", nameof(request.Title));
+    }
+
+    public async Task<int> CalculateCurrentStreakAsync(
+        Guid challengeId,
+        CancellationToken cancellationToken = default)
+    {
+        var logs = await _dailyLogRepository.GetByChallengeIdAsync(challengeId, cancellationToken);
+
+        if (!logs.Any())
+        {
+            return 0;
+        }
+
+        // Ordenar logs por data em ordem decrescente (mais recentes primeiro)
+        var sortedLogs = logs.OrderByDescending(l => l.Date).ToList();
+
+        int streak = 0;
+        var expectedDate = sortedLogs.First().Date; // Começar pela data mais recente
+
+        // Contar dias consecutivos de trás para frente
+        foreach (var log in sortedLogs)
+        {
+            // Se o log não é do dia esperado, a sequência quebra
+            if (log.Date != expectedDate)
+            {
+                break;
+            }
+
+            // Só contar se sobreviveu ao dia
+            if (log.Survived)
+            {
+                streak++;
+                expectedDate = expectedDate.AddDays(-1);
+            }
+            else
+            {
+                // Se não sobreviveu, a sequência quebra
+                break;
+            }
+        }
+
+        return streak;
+    }
+
+    private ChallengeResponse MapChallengeToResponse(Challenge challenge, int currentStreak)
+    {
+        var response = _mapper.Map<ChallengeResponse>(challenge);
+        response.CurrentStreak = currentStreak;
+        return response;
     }
 }

@@ -8,6 +8,7 @@ public class ChallengeResponse
     public required DateOnly StartDate { get; set; }
     public required DateOnly TargetEndDate { get; set; }
     public required bool IsActive { get; set; }
+    public int CurrentStreak { get; set; }
     public int DaysRemaining
     {
         get
