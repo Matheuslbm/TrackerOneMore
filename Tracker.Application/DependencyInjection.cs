@@ -14,6 +14,8 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChallengeService, ChallengeService>();
         services.AddScoped<IMoodService, MoodService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IAnalyticsService, AnalyticsService>();
         return services;
     }
 }
