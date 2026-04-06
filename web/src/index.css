@@ -2,7 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #121212;
-  color: white;
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 220 10% 8%;
+    --foreground: 220 5% 90%;
+
+    --card: 220 8% 12% / 0.6;
+    --card-foreground: 220 5% 90%;
+
+    --popover: 220 8% 12%;
+    --popover-foreground: 220 5% 90%;
+
+    --primary: 90 18% 32%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 220 6% 15% / 0.5;
+    --secondary-foreground: 220 5% 65%;
+
+    --muted: 220 6% 14%;
+    --muted-foreground: 220 5% 42%;
+
+    --accent: 270 25% 35%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 35% 40%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 6% 16% / 0.6;
+    --input: 220 6% 16%;
+    --ring: 90 18% 32%;
+
+    --radius: 1rem;
+
+    --moss: 90 18% 32%;
+    --moss-light: 90 15% 42%;
+    --grace: 270 25% 35%;
+    --streak-fire: 25 75% 48%;
+    --streak-fire-hot: 15 85% 52%;
+
+    --commit-0: 220 6% 13%;
+    --commit-1: 90 15% 20%;
+    --commit-2: 90 18% 27%;
+    --commit-3: 90 20% 34%;
+    --commit-4: 90 20% 42%;
+
+    --sidebar-background: 220 10% 9%;
+    --sidebar-foreground: 220 5% 90%;
+    --sidebar-primary: 90 18% 32%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 6% 15%;
+    --sidebar-accent-foreground: 220 5% 65%;
+    --sidebar-border: 220 6% 16%;
+    --sidebar-ring: 90 18% 32%;
+
+    --font-display: 'Outfit', sans-serif;
+    --font-body: 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: hsla(var(--card));
+    border: 1px solid hsla(var(--border));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .fire-gradient {
+    background: linear-gradient(180deg, hsl(var(--streak-fire-hot)), hsl(var(--streak-fire)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 }
