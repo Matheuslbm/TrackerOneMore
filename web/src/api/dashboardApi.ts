@@ -36,7 +36,7 @@ export function useAnalytics(startDate?: string, endDate?: string) {
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
 
-            const { data } = await api.get<AnalyticsResponse>('/analytics', { params });
+            const { data } = await api.get<any>('/analytics/mood-habit-trend', { params });
             return data;
         },
     });

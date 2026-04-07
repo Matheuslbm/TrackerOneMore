@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Flame, Plus, X, Settings2, Loader2 } from "lucide-react";
-import { useHabits, useCreateHabit, useDeleteHabit, useLogHabit } from "@/api/habitsApi";
+import { useHabits, useCreateHabit, useLogHabit, useWeeklyHabitLogs, useDeleteHabitLog, useUpdateHabit } from "@/api/habitsApi";
+import api from "@/api/api";
 import { toast } from "sonner";
 import { HabitType } from "@/shared/types";
 
@@ -40,17 +41,65 @@ const StreakFire = ({ streak }: { streak: number }) => {
 
 const HabitGrid = () => {
   const { data: habitsData, isLoading, isFetching } = useHabits();
+  const { data: weeklyData } = useWeeklyHabitLogs();
   const createHabitMutation = useCreateHabit();
-  const deleteHabitMutation = useDeleteHabit("");
   const logHabitMutation = useLogHabit();
+  const deleteHabitLogMutation = useDeleteHabitLog();
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState<HabitType>(HabitType.Productive);
+  const [newType, setNewType] = useState<HabitType>(HabitType.Daily);
   const [newFreq, setNewFreq] = useState(7);
   const [streakPopup, setStreakPopup] = useState<{ id: string; streak: number } | null>(null);
+  const [habitLogs, setHabitLogs] = useState<Record<string, "Completed" | "Grace" | "Missed">>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [editingFreq, setEditingFreq] = useState(1);
+  
+  // Debounce timer para evitar múltiplas requisições
+  const debounceTimerRef = useRef<Record<string, NodeJS.Timeout>>({});
+  
+  // Rastrear quais logs têm atualizações pendentes (aguardando debounce)
+  const pendingUpdatesRef = useRef<Set<string>>(new Set());
 
   const habits = habitsData?.items || [];
+
+  // Carregamento inicial dos logs do servidor quando a semana é determinada
+  useEffect(() => {
+    if (!weeklyData || habits.length === 0) return;
+
+    // Usar os logs que já vinham no weeklyData (nova forma com endpoint único)
+    if (weeklyData.logs) {
+      const logsMap: Record<string, "Completed" | "Grace" | "Missed"> = {};
+
+      for (const log of weeklyData.logs) {
+        const logKey = `${log.habitId}-${log.date}`;
+        logsMap[logKey] = log.status as "Completed" | "Grace" | "Missed";
+      }
+
+      // Só atualizar states que NÃO têm atualizações pendentes
+      setHabitLogs(prev => {
+        const newLogs = { ...prev };
+        for (const [key, status] of Object.entries(logsMap)) {
+          // Se não tem atualização pendente, atualizar do servidor
+          if (!pendingUpdatesRef.current.has(key)) {
+            newLogs[key] = status;
+          }
+        }
+        return newLogs;
+      });
+    }
+  }, [weeklyData, habits]);
+
+  // Cleanup: limpar timers ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      // Limpar todos os timers pendentes
+      Object.values(debounceTimerRef.current).forEach(timer => clearTimeout(timer));
+      // Limpar atualizações pendentes
+      pendingUpdatesRef.current.clear();
+    };
+  }, []);
 
   const handleAddHabit = async () => {
     if (!newName.trim()) {
@@ -66,7 +115,7 @@ const HabitGrid = () => {
         graceDaysAllowed: 1,
       });
       setNewName("");
-      setNewType(HabitType.Productive);
+      setNewType(HabitType.Daily);
       setNewFreq(7);
       setShowAdd(false);
       toast.success("Hábito criado com sucesso!");
@@ -77,28 +126,138 @@ const HabitGrid = () => {
 
   const handleDeleteHabit = async (habitId: string) => {
     try {
-      await deleteHabitMutation.mutateAsync();
+      await api.delete(`/habits/${habitId}`);
       toast.success("Hábito deletado");
+      // Refetch habits
+      window.location.reload();
     } catch (error: any) {
       toast.error(error.message || "Erro ao deletar hábito");
     }
   };
 
-  const handleLogHabit = async (habitId: string, status: "Completed" | "Missed" | "Grace") => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      await logHabitMutation.mutateAsync({
-        habitId,
-        date: today,
-        status,
-      });
+  const handleEditHabit = (habit: any) => {
+    setEditingId(habit.id);
+    setEditingName(habit.name);
+    setEditingFreq(habit.targetDaysPerWeek || 1);
+  };
 
-      if (status === "Completed") {
-        setStreakPopup({ id: habitId, streak: 1 });
-        setTimeout(() => setStreakPopup(null), 2000);
+  const handleSaveEdit = async (habitId: string) => {
+    if (!editingName.trim()) {
+      toast.error("Nome não pode ser vazio");
+      return;
+    }
+
+    try {
+      await api.put(`/habits/${habitId}`, {
+        name: editingName.trim(),
+        type: "Daily",
+        targetDaysPerWeek: editingFreq,
+        graceDaysAllowed: 1,
+      });
+      toast.success("Hábito atualizado!");
+      setEditingId(null);
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao atualizar hábito");
+    }
+  };
+
+  const handleLogHabit = async (habitId: string, dayIndex: number) => {
+    try {
+      // MESMA LÓGICA DA RENDERIZAÇÃO
+      const today = new Date();
+      const dayOfWeek = today.getDay();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + dayIndex);
+      const dateStr = date.toISOString().split("T")[0];
+      const logKey = `${habitId}-${dateStr}`;
+
+      // Ciclar entre os estados: Nada → Completed -> Missed -> Grace -> (delete)
+      const currentStatus = habitLogs[logKey] || null;
+      const nextStatus: "Completed" | "Grace" | "Missed" | null =
+        !currentStatus ? "Completed" :
+          currentStatus === "Completed" ? "Missed" :
+            currentStatus === "Missed" ? "Grace" :
+              null;
+
+      // Guardar estado anterior para reverter se houver erro
+      const previousStatus = currentStatus;
+
+      // Atualizar estado local imediatamente para feedback visual
+      if (nextStatus === null) {
+        // 4º clique: deletar
+        setHabitLogs(prev => {
+          const { [logKey]: _, ...rest } = prev;
+          return rest;
+        });
+      } else {
+        // Ciclar normalmente
+        setHabitLogs(prev => ({ ...prev, [logKey]: nextStatus }));
       }
 
-      toast.success("Registro salvo!");
+      // Marcar como atualização pendente (não deixar ser sobrescrito pelo servidor)
+      pendingUpdatesRef.current.add(logKey);
+
+      // Cancelar timeout anterior se existir
+      const timerKey = logKey;
+      if (debounceTimerRef.current[timerKey]) {
+        clearTimeout(debounceTimerRef.current[timerKey]);
+      }
+
+      // Criar novo timeout com debounce
+      debounceTimerRef.current[timerKey] = setTimeout(async () => {
+        try {
+          // Fazer a requisição apenas após a espera
+          if (nextStatus === null) {
+            await deleteHabitLogMutation.mutateAsync({
+              habitId,
+              date: dateStr,
+            });
+            toast.success("Marcação removida!");
+          } else {
+            await logHabitMutation.mutateAsync({
+              habitId,
+              date: dateStr,
+              status: nextStatus,
+            });
+            toast.success("Registro salvo!");
+          }
+        } catch (error: any) {
+          // Extrair mensagem de erro personalizada do backend
+          const errorMessage = error.response?.data?.error || error.message || "Erro ao registrar hábito";
+          toast.error(errorMessage);
+          
+          // Se foi rejeição de Grace Day, ir direto pro próximo estado (vazio)
+          // Se não, apenas reverter para o estado anterior
+          if (errorMessage.includes("Grace Day")) {
+            // Grace foi rejeitado, força ir para o próximo estado (nada/vazio)
+            setHabitLogs(prev => {
+              const { [logKey]: _, ...rest } = prev;
+              return rest;
+            });
+          } else {
+            // Outro erro, reverter para estado anterior
+            setHabitLogs(prev => {
+              if (previousStatus === null) {
+                const { [logKey]: _, ...rest } = prev;
+                return rest;
+              } else {
+                return { ...prev, [logKey]: previousStatus };
+              }
+            });
+          }
+        }
+
+        // Remover da lista de atualizações pendentes
+        pendingUpdatesRef.current.delete(logKey);
+        
+        // Limpar o timeout da referência
+        delete debounceTimerRef.current[timerKey];
+      }, 1000); // Aguarda 1000ms (mais tempo para o usuário terminar de clicar)
     } catch (error: any) {
       toast.error(error.message || "Erro ao registrar hábito");
     }
@@ -159,8 +318,8 @@ const HabitGrid = () => {
                 onChange={(e) => setNewType(e.target.value as HabitType)}
                 className="rounded-lg bg-background/60 px-2 py-2 text-sm text-foreground border border-border/40"
               >
-                <option value={HabitType.Productive}>Produtivo</option>
-                <option value={HabitType.Reducing}>Redutor</option>
+                <option value={HabitType.Daily}>Diário</option>
+                <option value={HabitType.WeeklyTarget}>Meta Semanal</option>
               </select>
               <div className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4 text-muted-foreground" />
@@ -212,8 +371,46 @@ const HabitGrid = () => {
               className="group relative grid grid-cols-[1fr_repeat(7,40px)_100px] items-center gap-2 rounded-xl px-1 py-2.5 transition-all hover:bg-muted/30"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">{habit.name}</span>
-                <span className="text-[10px] text-muted-foreground">{habit.targetDaysPerWeek}x/sem</span>
+                {editingId === habit.id ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="text-sm font-medium text-foreground bg-background border border-primary rounded px-2 py-1"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveEdit(habit.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                    <select
+                      value={editingFreq}
+                      onChange={(e) => setEditingFreq(Number(e.target.value))}
+                      className="text-xs bg-background border border-primary rounded px-1 py-1"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                        <option key={n} value={n}>{n}x</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleSaveEdit(habit.id)}
+                      className="text-xs bg-primary px-2 py-1 rounded text-primary-foreground"
+                    >
+                      Salvar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleEditHabit(habit)}
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+                    >
+                      {habit.name}
+                    </button>
+                    <span className="text-[10px] text-muted-foreground">{habit.targetDaysPerWeek}x/sem</span>
+                  </>
+                )}
                 <button
                   onClick={() => handleDeleteHabit(habit.id)}
                   className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
@@ -223,16 +420,37 @@ const HabitGrid = () => {
               </div>
 
               {/* Day buttons - placeholder for now, ideally would fetch weekly data */}
-              {dayLabels.map((_, di) => (
-                <div key={di} className="flex justify-center">
-                  <motion.button
-                    whileTap={{ scale: 0.8 }}
-                    whileHover={{ scale: 1.1 }}
-                    onClick={() => handleLogHabit(habit.id, "Completed")}
-                    className="h-8 w-8 rounded-lg border bg-muted/60 border-border hover:border-muted-foreground/30 transition-all duration-150"
-                  />
-                </div>
-              ))}
+              {dayLabels.map((_, di) => {
+                // MESMA LÓGICA DO HOOK useWeeklyHabitLogs
+                const today = new Date();
+                const dayOfWeek = today.getDay();
+                const startOfWeek = new Date(today);
+                startOfWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+                startOfWeek.setHours(0, 0, 0, 0);
+
+                const date = new Date(startOfWeek);
+                date.setDate(startOfWeek.getDate() + di);
+                const dateStr = date.toISOString().split("T")[0];
+                const logKey = `${habit.id}-${dateStr}`;
+                const status = habitLogs[logKey];
+
+                const statusColor =
+                  status === "Completed" ? "bg-primary border-primary" :
+                    status === "Grace" ? "bg-accent border-accent" :
+                      status === "Missed" ? "bg-destructive/50 border-destructive/50" :
+                        "bg-muted/60 border-border";
+
+                return (
+                  <div key={di} className="flex justify-center">
+                    <motion.button
+                      whileTap={{ scale: 0.8 }}
+                      whileHover={{ scale: 1.1 }}
+                      onClick={() => handleLogHabit(habit.id, di)}
+                      className={`h-8 w-8 rounded-lg border transition-all duration-150 ${statusColor}`}
+                    />
+                  </div>
+                );
+              })}
 
               <div className="flex items-center justify-center relative">
                 {habit.currentStreak > 0 ? (

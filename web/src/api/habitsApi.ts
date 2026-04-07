@@ -82,6 +82,67 @@ export function useDeleteHabit(habitId: string) {
     });
 }
 
+// Get habit log for specific date
+export function useHabitLogByDate(habitId: string | null, date: string | null) {
+    return useQuery({
+        queryKey: ['habitLog', habitId, date],
+        queryFn: async () => {
+            if (!habitId || !date) return null;
+            const { data } = await api.get<{ status: string | null }>(`/habits/${habitId}/log`, {
+                params: { date }
+            });
+            return data.status;
+        },
+        enabled: !!habitId && !!date,
+    });
+}
+
+// Get all logs for current week
+export function useWeeklyHabitLogs() {
+    return useQuery({
+        queryKey: ['habitWeeklyLogs'],
+        queryFn: async () => {
+            // CRÍTICO: Usar a MESMA lógica de cálculo de semana do HabitGrid
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            startOfWeek.setHours(0, 0, 0, 0);
+
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+            const startDateStr = startOfWeek.toISOString().split('T')[0];
+            const endDateStr = endOfWeek.toISOString().split('T')[0];
+
+            // Fazer uma única requisição para toda a semana
+            const { data } = await api.get<{
+                logs: Array<{ habitId: string; date: string; status: string }>
+            }>('/habits/logs/week', {
+                params: { startDate: startDateStr, endDate: endDateStr }
+            });
+
+            return {
+                logs: data.logs,
+                dates: (() => {
+                    const dates: string[] = [];
+                    for (let i = 0; i < 7; i++) {
+                        const date = new Date(startOfWeek);
+                        date.setDate(startOfWeek.getDate() + i);
+                        dates.push(date.toISOString().split('T')[0]);
+                    }
+                    return dates;
+                })()
+            };
+        },
+        // Refetch apenas uma vez por dia (não a cada minuto)
+        staleTime: 1000 * 60 * 60 * 24, // 24 horas
+        // Não refetch ao ganhar foco ou no mount (não sobrescreve state local durante debounce)
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
+    });
+}
+
 // Log habit
 export function useLogHabit() {
     const queryClient = useQueryClient();
@@ -95,7 +156,25 @@ export function useLogHabit() {
             return data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+            // Não invalidar query - deixa o estado local intacto
+            // queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+        },
+    });
+}
+
+// Delete habit log for specific date
+export function useDeleteHabitLog() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ habitId, date }: { habitId: string; date: string }) => {
+            await api.delete(`/habits/${habitId}/log`, {
+                params: { date }
+            });
+        },
+        onSuccess: () => {
+            // Não invalidar query - deixa o estado local intacto
+            // queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
         },
     });
 }

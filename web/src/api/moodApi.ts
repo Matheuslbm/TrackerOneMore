@@ -13,7 +13,7 @@ export function useMoods(startDate?: string, endDate?: string) {
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
 
-            const { data } = await api.get<MoodResponse[]>('/moods', { params });
+            const { data } = await api.get<MoodResponse[]>('/moods/range', { params });
             return data;
         },
     });
@@ -67,8 +67,11 @@ export function useLogMood() {
             const { data } = await api.post<MoodResponse>('/moods', logData);
             return data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
+            // Invalidar e refetch todas as queries de mood
             queryClient.invalidateQueries({ queryKey: [MOOD_QUERY_KEY] });
+            // Garanta que o refetch aconteça imediatamente
+            queryClient.refetchQueries({ queryKey: [MOOD_QUERY_KEY] });
         },
     });
 }

@@ -1,17 +1,31 @@
 import { motion } from "framer-motion";
-import { Flame, Target, Trophy, TrendingUp, Zap, BarChart3 } from "lucide-react";
-
-const streaks = [
-  { name: "Leitura", streak: 24, best: 30 },
-  { name: "Código", streak: 18, best: 22 },
-  { name: "Meditar", streak: 12, best: 15 },
-  { name: "Exercício", streak: 5, best: 14 },
-  { name: "Água 2L", streak: 3, best: 10 },
-];
+import { Flame, Target, Trophy, TrendingUp, Zap, BarChart3, Loader2 } from "lucide-react";
+import { useDashboard } from "@/api/dashboardApi";
+import { useHabits } from "@/api/habitsApi";
 
 const Summary = () => {
-  const totalStreak = streaks.reduce((acc, s) => acc + s.streak, 0);
-  const avgConsistency = 78;
+  const { data: dashboardData, isLoading: dashboardLoading } = useDashboard();
+  const { data: habitsData, isLoading: habitsLoading } = useHabits(1, 100);
+
+  const totalStreak = dashboardData?.totalStreaks || 0;
+  const avgConsistency = dashboardData?.consistency || 0;
+  const activeHabits = habitsData?.items || [];
+  const activeChallenges = dashboardData?.activeChallenges?.length || 0;
+
+  // Transform habit data to streak format
+  const streaks = activeHabits.map((habit) => ({
+    name: habit.name,
+    streak: habit.currentStreak || 0,
+    best: Math.max(habit.currentStreak || 0, 10),
+  }));
+
+  if (dashboardLoading || habitsLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -35,9 +49,9 @@ const Summary = () => {
       {/* Quick stats */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: "Hábitos Ativos", value: "5", icon: Target, color: "text-primary" },
-          { label: "Consistência", value: `${avgConsistency}%`, icon: TrendingUp, color: "text-moss-light" },
-          { label: "Desafios Ativos", value: "2", icon: Zap, color: "text-accent" },
+          { label: "Hábitos Ativos", value: activeHabits.length.toString(), icon: Target, color: "text-primary" },
+          { label: "Consistência", value: `${Math.round(avgConsistency)}%`, icon: TrendingUp, color: "text-moss-light" },
+          { label: "Desafios Ativos", value: activeChallenges.toString(), icon: Zap, color: "text-accent" },
           { label: "Emblemas", value: "1", icon: Trophy, color: "text-streak-fire" },
         ].map((stat, i) => (
           <motion.div
@@ -100,11 +114,10 @@ const Summary = () => {
         </div>
         <div className="grid grid-cols-7 gap-2">
           {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day, i) => {
-            const pct = [90, 80, 100, 70, 85, 60, 0][i];
             return (
               <div key={day} className="flex flex-col items-center gap-2">
                 <div className="h-28 w-full rounded-lg bg-muted/30 flex items-end overflow-hidden">
-                  <motion.div initial={{ height: 0 }} animate={{ height: `${pct}%` }} transition={{ duration: 0.5, delay: i * 0.05 }} className="w-full rounded-t-md bg-primary/70" />
+                  <div className="w-full rounded-t-md bg-primary/70" style={{ height: '0%' }} />
                 </div>
                 <span className="font-display text-[10px] text-muted-foreground">{day}</span>
               </div>

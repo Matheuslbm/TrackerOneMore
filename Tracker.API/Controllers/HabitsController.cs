@@ -5,6 +5,7 @@ using Tracker.API.Extensions;
 using Tracker.Application.DTOs;
 using Tracker.Application.Interfaces;
 using Tracker.Application.Services;
+using Tracker.Domain.Enums;
 using Tracker.Domain.Exceptions;
 
 namespace Tracker.API.Controllers;
@@ -64,17 +65,84 @@ public class HabitsController : ControllerBase
         }
     }
 
-    [HttpPost("{habitId:guid}/log")]
-    public async Task<IActionResult> LogHabit(
+    [HttpGet("logs/week")]
+    public async Task<IActionResult> GetWeeklyHabitLogs(
+        [FromQuery] DateOnly startDate,
+        [FromQuery] DateOnly endDate,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = User.GetUserId();
+
+        try
+        {
+            var logs = await _habitService.GetWeeklyHabitLogsAsync(userId, startDate, endDate, cancellationToken);
+            _logger.LogInformation("Logs da semana recuperados para usuário {UserId}: {StartDate} a {EndDate}", userId, startDate, endDate);
+            return Ok(logs);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar logs da semana");
+            return StatusCode(500, new { error = "Erro ao buscar logs da semana" });
+        }
+    }
+
+    [HttpGet("{habitId:guid}/log")]
+    public async Task<IActionResult> GetHabitLogByDate(
         Guid habitId,
-        LogHabitRequest request,
+        [FromQuery] DateOnly date,
         CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
 
         try
         {
-            var response = await _habitService.LogHabitAsync(habitId, userId, request, cancellationToken);
+            var logStatus = await _habitService.GetHabitLogByDateAsync(habitId, userId, date, cancellationToken);
+            _logger.LogInformation("Log do hábito {HabitId} para {Date} recuperado", habitId, date);
+            return Ok(new { status = logStatus });
+        }
+        catch (HabitNotFoundException ex)
+        {
+            _logger.LogWarning("Hábito não encontrado: {HabitId}", habitId);
+            return NotFound(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Usuário {UserId} tentou acessar hábito de outro usuário: {HabitId}", userId, habitId);
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar log do hábito");
+            return StatusCode(500, new { error = "Erro ao buscar log" });
+        }
+    }
+
+    [HttpPost("{habitId:guid}/log")]
+    public async Task<IActionResult> LogHabit(
+        Guid habitId,
+        [FromBody] LogHabitStringRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+
+        try
+        {
+            // Mapear string para LogStatus enum
+            var logStatus = request.Status switch
+            {
+                "Completed" => LogStatus.Completed,
+                "Grace" => LogStatus.GraceDay,
+                "Missed" => LogStatus.Missed,
+                _ => throw new ArgumentException($"Status inválido: {request.Status}")
+            };
+
+            var logRequest = new LogHabitRequest
+            {
+                Date = request.Date,
+                Status = logStatus
+            };
+
+            var response = await _habitService.LogHabitAsync(habitId, userId, logRequest, cancellationToken);
             _logger.LogInformation("Log criado para hábito {HabitId} do usuário {UserId}", habitId, userId);
             return Ok(response);
         }
@@ -92,6 +160,42 @@ public class HabitsController : ControllerBase
         {
             _logger.LogWarning("Validação falhou ao criar log: {Message}", ex.Message);
             return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning("Regra de negócio violada: {Message}", ex.Message);
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpDelete("{habitId:guid}/log")]
+    public async Task<IActionResult> DeleteHabitLog(
+        Guid habitId,
+        [FromQuery] DateOnly date,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+
+        try
+        {
+            await _habitService.DeleteHabitLogAsync(habitId, userId, date, cancellationToken);
+            _logger.LogInformation("Log do hábito {HabitId} para {Date} deletado", habitId, date);
+            return NoContent();
+        }
+        catch (HabitNotFoundException ex)
+        {
+            _logger.LogWarning("Hábito não encontrado: {HabitId}", habitId);
+            return NotFound(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Usuário {UserId} tentou acessar hábito de outro usuário: {HabitId}", userId, habitId);
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao deletar log do hábito");
+            return StatusCode(500, new { error = "Erro ao deletar log" });
         }
     }
 

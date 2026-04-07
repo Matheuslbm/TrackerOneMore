@@ -50,7 +50,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // URL padrão do Vite
+        policy.WithOrigins("http://localhost:5173", "http://localhost:8080") // URLs de desenvolvimento
               .AllowAnyHeader()
               .AllowAnyMethod();
     });

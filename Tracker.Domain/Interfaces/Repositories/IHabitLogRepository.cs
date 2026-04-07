@@ -9,6 +9,8 @@ public interface IHabitLogRepository
 
     Task UpdateAsync(HabitLog habitLog, CancellationToken cancellationToken = default);
 
+    Task DeleteByDateAsync(Guid habitId, DateOnly date, CancellationToken cancellationToken = default);
+
     //obtem todos os logs de um hábito específico ordenador por dat descendente
     Task<IEnumerable<HabitLog>> GetLogsByHabitIdAsync(Guid habitId, CancellationToken cancellationToken = default);
 

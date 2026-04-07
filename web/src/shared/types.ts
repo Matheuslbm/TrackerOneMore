@@ -21,8 +21,8 @@ export interface RegisterRequest {
 
 // Habit Types
 export enum HabitType {
-    Productive = "Productive",
-    Reducing = "Reducing"
+    Daily = "Daily",
+    WeeklyTarget = "WeeklyTarget"
 }
 
 export interface HabitResponse {
@@ -86,7 +86,7 @@ export interface LogChallengeRequest {
 
 // Mood Types
 export enum MoodLevel {
-    Terrible = 1,
+    Awful = 1,
     Bad = 2,
     Neutral = 3,
     Good = 4,

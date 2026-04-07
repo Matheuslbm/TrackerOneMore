@@ -52,6 +52,30 @@ public class HabitService : IHabitService
         if (habit.UserId != userId)
             throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
 
+        // ✋ VALIDAÇÃO: Grace Day só pode ser usado 1x por semana
+        if (request.Status == LogStatus.GraceDay)
+        {
+            // Calcular o início da semana (segunda-feira)
+            var dateOfWeek = (int)request.Date.DayOfWeek;
+            var dayOffsetFromMonday = dateOfWeek == 0 ? 6 : dateOfWeek - 1;
+            var startOfWeek = request.Date.AddDays(-dayOffsetFromMonday);
+            var endOfWeek = startOfWeek.AddDays(6);
+
+            // Buscar se já existe um Grace Day nessa semana para esse hábito
+            var allLogsThisWeek = await _habitLogRepository.GetLogsByHabitIdAsync(habitId, cancellationToken);
+            var graceInWeek = allLogsThisWeek.FirstOrDefault(l => 
+                l.Status == LogStatus.GraceDay && 
+                l.Date >= startOfWeek && 
+                l.Date <= endOfWeek &&
+                l.Date != request.Date // Permitir atualizar o mesmo dia
+            );
+
+            if (graceInWeek != null)
+            {
+                throw new InvalidOperationException($"Você já usou seu Grace Day nesta semana ({graceInWeek.Date:dd/MM/yyyy}). Limite de 1 por semana.");
+            }
+        }
+
         var existingLog = await _habitLogRepository.GetLogByDateAsync(habitId, request.Date, cancellationToken);
 
         if (existingLog != null)
@@ -196,5 +220,78 @@ public class HabitService : IHabitService
         return response;
     }
 
+    public async Task<string?> GetHabitLogByDateAsync(Guid habitId, Guid userId, DateOnly date, CancellationToken cancellationToken = default)
+    {
+        var habit = await _habitRepository.GetByIdAsync(habitId, cancellationToken)
+            ?? throw new HabitNotFoundException(habitId);
+
+        // 🔐 SEGURANÇA: Validar que o hábito pertence ao usuário autenticado
+        if (habit.UserId != userId)
+            throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
+
+        var log = await _habitLogRepository.GetLogByDateAsync(habitId, date, cancellationToken);
+
+        if (log == null)
+            return null;
+
+        // Mapear enum para string que o frontend espera
+        return log.Status switch
+        {
+            LogStatus.Completed => "Completed",
+            LogStatus.GraceDay => "Grace",
+            LogStatus.Missed => "Missed",
+            _ => null
+        };
+    }
+
+    public async Task DeleteHabitLogAsync(Guid habitId, Guid userId, DateOnly date, CancellationToken cancellationToken = default)
+    {
+        var habit = await _habitRepository.GetByIdAsync(habitId, cancellationToken)
+            ?? throw new HabitNotFoundException(habitId);
+
+        // 🔐 SEGURANÇA: Validar que o hábito pertence ao usuário autenticado
+        if (habit.UserId != userId)
+            throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
+
+        await _habitLogRepository.DeleteByDateAsync(habitId, date, cancellationToken);
+    }
+
+    public async Task<WeeklyHabitLogsResponse> GetWeeklyHabitLogsAsync(
+        Guid userId,
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default)
+    {
+        // Obter todos os hábitos do usuário
+        var habits = await _habitRepository.GetAllByUserIdAsync(userId, cancellationToken);
+
+        var logs = new List<WeeklyHabitLogItem>();
+
+        // Para cada hábito, buscar os logs da semana
+        foreach (var habit in habits)
+        {
+            var habitLogs = await _habitLogRepository.GetLogsByHabitIdAsync(habit.Id, cancellationToken);
+
+            // Filtrar logs dentro do intervalo de datas
+            var weekLogs = habitLogs
+                .Where(l => l.Date >= startDate && l.Date <= endDate)
+                .Select(l => new WeeklyHabitLogItem
+                {
+                    HabitId = l.HabitId,
+                    Date = l.Date,
+                    Status = l.Status switch
+                    {
+                        LogStatus.Completed => "Completed",
+                        LogStatus.GraceDay => "Grace",
+                        LogStatus.Missed => "Missed",
+                        _ => ""
+                    }
+                });
+
+            logs.AddRange(weekLogs);
+        }
+
+        return new WeeklyHabitLogsResponse { Logs = logs };
+    }
 
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { useMoods, useLogMood } from "@/api/moodApi";
@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { MoodLevel } from "@/shared/types";
 
 const moodLevels = [
-  { id: MoodLevel.Terrible, label: "Péssimo", color: "bg-destructive/50" },
+  { id: MoodLevel.Awful, label: "Péssimo", color: "bg-destructive/50" },
   { id: MoodLevel.Bad, label: "Ruim", color: "bg-destructive/30" },
   { id: MoodLevel.Neutral, label: "Neutro", color: "bg-muted-foreground/40" },
   { id: MoodLevel.Good, label: "Bem", color: "bg-primary/60" },
@@ -18,31 +18,61 @@ const dayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const MoodTracker = () => {
   const [selectedMood, setSelectedMood] = useState<MoodLevel | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [localMoodMap, setLocalMoodMap] = useState<Record<string, MoodLevel>>({});
 
-  // Get moods for the week
-  const weekStart = new Date(selectedDate);
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  // Get moods for the week - MESMA LÓGICA DO HABITGRID (semana começa na segunda)
+  const today = new Date(selectedDate);
+  const dayOfWeek = today.getDay();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setDate(weekStart.getDate() + 6);
 
-  const { data: moods = [], isLoading, isFetching } = useMoods(
+  const { data: moods = [], isLoading, isFetching, refetch } = useMoods(
     weekStart.toISOString().split("T")[0],
     weekEnd.toISOString().split("T")[0]
   );
   const logMoodMutation = useLogMood();
 
+  // Sincronizar localMoodMap com dados do servidor
+  useEffect(() => {
+    if (moods && moods.length > 0) {
+      const serverMoodMap: Record<string, MoodLevel> = {};
+      moods.forEach(mood => {
+        // Converter string de enum para número
+        let numericLevel: MoodLevel = mood.level as any;
+
+        // Se vier como string, converter para número
+        if (typeof mood.level === 'string') {
+          const levelMap: Record<string, MoodLevel> = {
+            'Awful': MoodLevel.Awful,
+            'Bad': MoodLevel.Bad,
+            'Neutral': MoodLevel.Neutral,
+            'Good': MoodLevel.Good,
+            'Excellent': MoodLevel.Excellent,
+          };
+          numericLevel = levelMap[mood.level] || (mood.level as any);
+        }
+
+        serverMoodMap[mood.date] = numericLevel;
+      });
+      // Fazer merge: dados do servidor sobrescrevem dados locais
+      setLocalMoodMap(prev => {
+        return { ...prev, ...serverMoodMap };
+      });
+    }
+  }, [moods]);
+
   // Create a map of date -> mood for easy lookup
   const moodMap = useMemo(() => {
-    const map: Record<string, MoodLevel> = {};
-    moods.forEach(mood => {
-      map[mood.date] = mood.level;
-    });
-    return map;
-  }, [moods]);
+    // Apenas use localMoodMap que já foi sincronizado com os dados do servidor
+    return { ...localMoodMap };
+  }, [localMoodMap]);
 
   const getMoodStyle = (moodId: MoodLevel): React.CSSProperties => {
     const heights: Record<MoodLevel, number> = {
-      [MoodLevel.Terrible]: 20,
+      [MoodLevel.Awful]: 20,
       [MoodLevel.Bad]: 35,
       [MoodLevel.Neutral]: 50,
       [MoodLevel.Good]: 70,
@@ -53,7 +83,7 @@ const MoodTracker = () => {
 
   const getMoodColor = (moodId: MoodLevel): string => {
     switch (moodId) {
-      case MoodLevel.Terrible:
+      case MoodLevel.Awful:
         return "bg-destructive/60";
       case MoodLevel.Bad:
         return "bg-destructive/35";
@@ -74,6 +104,9 @@ const MoodTracker = () => {
       dateToSet.setDate(dateToSet.getDate() + dayIndex);
       const dateStr = dateToSet.toISOString().split("T")[0];
 
+      // Atualizar estado local imediatamente para feedback visual
+      setLocalMoodMap(prev => ({ ...prev, [dateStr]: level }));
+
       await logMoodMutation.mutateAsync({
         date: dateStr,
         level,
@@ -82,6 +115,15 @@ const MoodTracker = () => {
       toast.success("Humor registrado!");
     } catch (error: any) {
       toast.error(error.message || "Erro ao registrar humor");
+      // Reverter o estado local se falhar
+      setLocalMoodMap(prev => {
+        const copy = { ...prev };
+        const dateToSet = new Date(weekStart);
+        dateToSet.setDate(dateToSet.getDate() + dayIndex);
+        const dateStr = dateToSet.toISOString().split("T")[0];
+        delete copy[dateStr];
+        return copy;
+      });
     }
   };
 
@@ -137,11 +179,21 @@ const MoodTracker = () => {
 
               {/* Mood buttons */}
               <div className="flex flex-col gap-1">
-                {[MoodLevel.Excellent, MoodLevel.Good, MoodLevel.Neutral, MoodLevel.Bad, MoodLevel.Terrible].map((level) => {
+                {[MoodLevel.Excellent, MoodLevel.Good, MoodLevel.Neutral, MoodLevel.Bad, MoodLevel.Awful].map((level) => {
                   const isSelected = moodForDay === level;
+
+                  // Classes dinâmicas para cada nível de humor quando selecionado
                   const buttonClass = isSelected
-                    ? `h-4 w-8 rounded-sm border transition-all text-[8px] font-medium ${getMoodColor(level)} border-foreground/20 text-primary-foreground disabled:opacity-50`
-                    : "h-4 w-8 rounded-sm border transition-all text-[8px] font-medium bg-muted border-border text-muted-foreground hover:border-muted-foreground/40 disabled:opacity-50";
+                    ? level === MoodLevel.Excellent
+                      ? "h-4 w-8 rounded-sm border border-foreground/20 transition-all text-[8px] font-medium bg-primary text-primary-foreground disabled:opacity-50"
+                      : level === MoodLevel.Good
+                        ? "h-4 w-8 rounded-sm border border-foreground/20 transition-all text-[8px] font-medium bg-primary/70 text-primary-foreground disabled:opacity-50"
+                        : level === MoodLevel.Neutral
+                          ? "h-4 w-8 rounded-sm border border-foreground/20 transition-all text-[8px] font-medium bg-muted-foreground/30 text-foreground disabled:opacity-50"
+                          : level === MoodLevel.Bad
+                            ? "h-4 w-8 rounded-sm border border-foreground/20 transition-all text-[8px] font-medium bg-destructive/35 text-foreground disabled:opacity-50"
+                            : "h-4 w-8 rounded-sm border border-foreground/20 transition-all text-[8px] font-medium bg-destructive/60 text-foreground disabled:opacity-50"
+                    : "h-4 w-8 rounded-sm border border-border transition-all text-[8px] font-medium bg-muted text-muted-foreground hover:border-muted-foreground/40 disabled:opacity-50";
 
                   return (
                     <motion.button

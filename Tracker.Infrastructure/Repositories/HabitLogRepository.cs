@@ -32,6 +32,16 @@ public class HabitLogRepository : IHabitLogRepository
         await SaveChangesAsync(cancellationToken);
     }
 
+    public async Task DeleteByDateAsync(Guid habitId, DateOnly date, CancellationToken cancellationToken = default)
+    {
+        var habitLog = await GetLogByDateAsync(habitId, date, cancellationToken);
+        if (habitLog != null)
+        {
+            _dbContext.HabitLogs.Remove(habitLog);
+            await SaveChangesAsync(cancellationToken);
+        }
+    }
+
     public async Task<IEnumerable<HabitLog>> GetLogsByHabitIdAsync(Guid habitId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.HabitLogs
