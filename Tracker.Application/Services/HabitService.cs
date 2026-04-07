@@ -27,12 +27,12 @@ public class HabitService : IHabitService
     {
         ValidateCreateHabitRequest(request);
 
+        // O GraceDaysAllowed é calculado automaticamente pelo construtor de Habit
         var habit = new Habit(
             userId: userId,
             name: request.Name,
             type: request.Type,
-            targetDaysPerWeek: request.TargetDaysPerWeek,
-            graceDaysAllowed: request.GraceDaysAllowed);
+            targetDaysPerWeek: request.TargetDaysPerWeek);
 
         await _habitRepository.AddAsync(habit, cancellationToken);
 
@@ -52,32 +52,41 @@ public class HabitService : IHabitService
         if (habit.UserId != userId)
             throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
 
-        // ✋ VALIDAÇÃO: Grace Day só pode ser usado 1x por semana
+        // Buscar log existente (se houver) para reutilizar na validação
+        var existingLog = await _habitLogRepository.GetLogByDateAsync(habitId, request.Date, cancellationToken);
+
+        // 🔐 BLINDAGEM: Validação da cota semanal de GraceDay
         if (request.Status == LogStatus.GraceDay)
         {
-            // Calcular o início da semana (segunda-feira)
+            // Determinar os limites da semana (segunda a domingo)
             var dateOfWeek = (int)request.Date.DayOfWeek;
             var dayOffsetFromMonday = dateOfWeek == 0 ? 6 : dateOfWeek - 1;
             var startOfWeek = request.Date.AddDays(-dayOffsetFromMonday);
             var endOfWeek = startOfWeek.AddDays(6);
 
-            // Buscar se já existe um Grace Day nessa semana para esse hábito
-            var allLogsThisWeek = await _habitLogRepository.GetLogsByHabitIdAsync(habitId, cancellationToken);
-            var graceInWeek = allLogsThisWeek.FirstOrDefault(l =>
-                l.Status == LogStatus.GraceDay &&
-                l.Date >= startOfWeek &&
-                l.Date <= endOfWeek &&
-                l.Date != request.Date // Permitir atualizar o mesmo dia
-            );
+            // Contar quantos GraceDay já foram usados nesta semana
+            var graceUsedThisWeek = await _habitLogRepository.CountLogsByStatusInPeriodAsync(
+                habitId,
+                LogStatus.GraceDay,
+                startOfWeek,
+                endOfWeek,
+                cancellationToken);
 
-            if (graceInWeek != null)
+            // Se já existe um GraceDay neste dia específico, remover da contagem para permitir atualização
+            if (existingLog?.Status == LogStatus.GraceDay)
             {
-                throw new InvalidOperationException($"Você já usou seu Grace Day nesta semana ({graceInWeek.Date:dd/MM/yyyy}). Limite de 1 por semana.");
+                graceUsedThisWeek--;
+            }
+
+            // ✋ REJEIÇÃO: Se cota foi excedida, não criar log e lançar exceção
+            if (graceUsedThisWeek >= habit.GraceDaysAllowed)
+            {
+                throw new DomainException(
+                    $"Limite de Curingas da semana atingido. Você já usou {graceUsedThisWeek} de {habit.GraceDaysAllowed} Curingas disponíveis.");
             }
         }
 
-        var existingLog = await _habitLogRepository.GetLogByDateAsync(habitId, request.Date, cancellationToken);
-
+        // Atualizar log existente ou criar novo
         if (existingLog != null)
         {
             existingLog.ChangeStatus(request.Status);
@@ -129,14 +138,17 @@ public class HabitService : IHabitService
         };
     }
 
+    /// <summary>
+    /// Calcula o streak atual de um hábito iterando os logs de trás para frente.
+    /// Regra: Completed incrementa o streak. GraceDay protege o streak mas não incrementa. Missed quebra o streak.
+    /// Detecta buracos de datas (dias sem registro) e encerra o streak.
+    /// </summary>
     public async Task<int> CalculateCurrentStreakAsync(Guid habitId, CancellationToken cancellationToken = default)
     {
         var logs = await _habitLogRepository.GetLogsByHabitIdAsync(habitId, cancellationToken);
 
         if (!logs.Any())
-        {
             return 0;
-        }
 
         // Ordenar por data DESC (mais recentes primeiro)
         var sortedLogs = logs.OrderByDescending(l => l.Date).ToList();
@@ -144,37 +156,23 @@ public class HabitService : IHabitService
         int streak = 0;
         DateOnly? lastDate = null;
 
-        // Contar apenas os Completed consecutivos, verificando gaps entre dias
+        // Iterar logs em ordem reversa (mais recentes primeiro)
         foreach (var log in sortedLogs)
         {
-            // Se há gap entre logs, o streak quebra
+            // Detectar gaps: se há dias faltando entre logs consecutivos, o streak quebra
             if (lastDate.HasValue)
             {
-                // ✅ CORREÇÃO: Usar diferença REAL em dias entre DateOnly objetos
-                // DayNumber retorna o dia do ano (1-365), então subtrair diretamente funciona para comparar
-                // Quando ordena DESC, a diferença entre dias consecutivos deve ser exatamente 1
                 var daysDifference = lastDate.Value.DayNumber - log.Date.DayNumber;
-
-                // Se não é exatamente 1 dia de diferença, há um gap
                 if (daysDifference != 1)
-                {
-                    // Há dias faltando ou não é consecutivo, streak termina
-                    return streak;
-                }
+                    return streak; // Há um buraco, streak encerra
             }
 
-            switch (log.Status)
-            {
-                case LogStatus.Completed:
-                    streak++;
-                    break;
-                case LogStatus.GraceDay:
-                    // GraceDay não quebra e não incrementa o contador
-                    break;
-                case LogStatus.Missed:
-                    // Missed quebra o streak imediatamente
-                    return streak;
-            }
+            // Processar status do log
+            if (log.Status == LogStatus.Completed)
+                streak++;
+            else if (log.Status == LogStatus.Missed)
+                return streak; // Missed quebra imediatamente
+            // GraceDay: apenas continua (não incrementa nem quebra)
 
             lastDate = log.Date;
         }
@@ -205,7 +203,8 @@ public class HabitService : IHabitService
         if (habit.UserId != userId)
             throw new UnauthorizedAccessException("Você não tem permissão para acessar este hábito.");
 
-        habit.Update(request.Name, request.Type, request.TargetDaysPerWeek, request.GraceDaysAllowed);
+        // O GraceDaysAllowed é recalculado automaticamente pelo método Update
+        habit.Update(request.Name, request.Type, request.TargetDaysPerWeek);
         await _habitRepository.UpdateAsync(habit, cancellationToken);
 
         var currentStreak = await CalculateCurrentStreakAsync(habitId, cancellationToken);

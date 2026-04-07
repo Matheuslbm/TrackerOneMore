@@ -233,10 +233,10 @@ const HabitGrid = () => {
           const errorMessage = error.response?.data?.error || error.message || "Erro ao registrar hábito";
           toast.error(errorMessage);
 
-          // Se foi rejeição de Grace Day, ir direto pro próximo estado (vazio)
-          // Se não, apenas reverter para o estado anterior
-          if (errorMessage.includes("Grace Day")) {
-            // Grace foi rejeitado, força ir para o próximo estado (nada/vazio)
+          // ✋ Se tentou logar um Grace e foi rejeitado (erro contém "Curingas"), deixar o dia vazio
+          // Isso garante que o dia não fica marcado em vermelho (Missed)
+          if (errorMessage.includes("Curingas") && nextStatus === "Grace") {
+            // Grace foi rejeitado, remove qualquer marcação deixando vazio
             setHabitLogs(prev => {
               const { [logKey]: _, ...rest } = prev;
               return rest;

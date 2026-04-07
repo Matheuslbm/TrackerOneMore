@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tracker.Domain.Entities;
+using Tracker.Domain.Enums;
 using Tracker.Domain.Interfaces.Repositories;
 using Tracker.Infrastructure.Data;
 
@@ -56,6 +57,27 @@ public class HabitLogRepository : IHabitLogRepository
         return await _dbContext.HabitLogs
             .AsNoTracking()
             .FirstOrDefaultAsync(log => log.HabitId == habitId && log.Date == date, cancellationToken);
+    }
+
+    /// <summary>
+    /// Conta quantos logs com um status específico existem em um período de datas.
+    /// Utilizado para validar a cota de GraceDays permitida por semana.
+    /// </summary>
+    public async Task<int> CountLogsByStatusInPeriodAsync(
+        Guid habitId,
+        LogStatus status,
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.HabitLogs
+            .AsNoTracking()
+            .CountAsync(log =>
+                log.HabitId == habitId &&
+                log.Status == status &&
+                log.Date >= startDate &&
+                log.Date <= endDate,
+                cancellationToken);
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)

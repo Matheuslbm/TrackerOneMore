@@ -156,15 +156,21 @@ public class HabitsController : ControllerBase
             _logger.LogWarning("Usuário {UserId} tentou acessar hábito de outro usuário: {HabitId}", userId, habitId);
             return Forbid();
         }
+        catch (DomainException ex)
+        {
+            // ✋ Cota excedida: retorna 400 com mensagem, frontend não marca o dia
+            _logger.LogWarning("Regra de negócio violada ao logar hábito: {Message}", ex.Message);
+            return BadRequest(new { error = ex.Message });
+        }
         catch (ArgumentException ex)
         {
             _logger.LogWarning("Validação falhou ao criar log: {Message}", ex.Message);
             return BadRequest(new { error = ex.Message });
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
-            _logger.LogWarning("Regra de negócio violada: {Message}", ex.Message);
-            return BadRequest(new { error = ex.Message });
+            _logger.LogError(ex, "Erro inesperado ao registrar log do hábito");
+            return StatusCode(500, new { error = "Erro ao registrar log" });
         }
     }
 

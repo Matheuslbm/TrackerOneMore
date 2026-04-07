@@ -3,6 +3,10 @@ using Tracker.Domain.Enums;
 
 namespace Tracker.Application.DTOs;
 
+/// <summary>
+/// Requisição para atualizar um hábito existente.
+/// O GraceDaysAllowed é recalculado automaticamente pelo sistema com base na nova configuração.
+/// </summary>
 public class UpdateHabitRequest
 {
     [Required(ErrorMessage = "O nome do hábito é obrigatório")]
@@ -13,7 +17,4 @@ public class UpdateHabitRequest
 
     [Range(1, 7, ErrorMessage = "TargetDaysPerWeek deve estar entre 1 e 7")]
     public int? TargetDaysPerWeek { get; set; }
-
-    [Range(0, int.MaxValue, ErrorMessage = "GraceDaysAllowed não pode ser negativo")]
-    public int GraceDaysAllowed { get; set; }
 }

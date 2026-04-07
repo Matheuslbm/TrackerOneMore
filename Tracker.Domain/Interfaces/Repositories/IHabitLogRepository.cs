@@ -1,4 +1,5 @@
 using Tracker.Domain.Entities;
+using Tracker.Domain.Enums;
 
 namespace Tracker.Domain.Interfaces.Repositories;
 
@@ -16,6 +17,17 @@ public interface IHabitLogRepository
 
     // obtem o log de um hábito para uma data epecifica.
     Task<HabitLog?> GetLogByDateAsync(Guid habitId, DateOnly date, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Conta quantos logs com um status específico existem em um período de datas.
+    /// Utilizado para validar a cota de GraceDays permitida por semana.
+    /// </summary>
+    Task<int> CountLogsByStatusInPeriodAsync(
+        Guid habitId,
+        LogStatus status,
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default);
 
     // salva todas as alterações no banco de dados
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
