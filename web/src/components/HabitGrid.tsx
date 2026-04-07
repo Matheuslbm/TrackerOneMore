@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Flame, Plus, X, Settings2, Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useHabits, useCreateHabit, useLogHabit, useWeeklyHabitLogs, useDeleteHabitLog, useUpdateHabit } from "@/api/habitsApi";
 import api from "@/api/api";
 import { toast } from "sonner";
@@ -45,6 +46,7 @@ const HabitGrid = () => {
   const createHabitMutation = useCreateHabit();
   const logHabitMutation = useLogHabit();
   const deleteHabitLogMutation = useDeleteHabitLog();
+  const queryClient = useQueryClient();
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -55,10 +57,10 @@ const HabitGrid = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingFreq, setEditingFreq] = useState(1);
-  
+
   // Debounce timer para evitar múltiplas requisições
   const debounceTimerRef = useRef<Record<string, NodeJS.Timeout>>({});
-  
+
   // Rastrear quais logs têm atualizações pendentes (aguardando debounce)
   const pendingUpdatesRef = useRef<Set<string>>(new Set());
 
@@ -230,7 +232,7 @@ const HabitGrid = () => {
           // Extrair mensagem de erro personalizada do backend
           const errorMessage = error.response?.data?.error || error.message || "Erro ao registrar hábito";
           toast.error(errorMessage);
-          
+
           // Se foi rejeição de Grace Day, ir direto pro próximo estado (vazio)
           // Se não, apenas reverter para o estado anterior
           if (errorMessage.includes("Grace Day")) {
@@ -252,11 +254,13 @@ const HabitGrid = () => {
           }
         }
 
-        // Remover da lista de atualizações pendentes
-        pendingUpdatesRef.current.delete(logKey);
-        
-        // Limpar o timeout da referência
-        delete debounceTimerRef.current[timerKey];
+        // ✅ CORREÇÃO: Aguardar pequeno delay para garantir que refetches iniciaram
+        // antes de remover da lista de atualizações pendentes
+        // Isso evita race condition onde useEffect dispara enquanto a chave ainda deveria estar protegida
+        setTimeout(() => {
+          pendingUpdatesRef.current.delete(logKey);
+          delete debounceTimerRef.current[timerKey];
+        }, 50); // 50ms é suficiente para mutation.onSuccess disparar e invalidateQueries começar
       }, 1000); // Aguarda 1000ms (mais tempo para o usuário terminar de clicar)
     } catch (error: any) {
       toast.error(error.message || "Erro ao registrar hábito");

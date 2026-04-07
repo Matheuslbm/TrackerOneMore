@@ -156,8 +156,11 @@ export function useLogHabit() {
             return data;
         },
         onSuccess: () => {
-            // Não invalidar query - deixa o estado local intacto
-            // queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+            // ✅ CORREÇÃO: Invalidar AMBAS as queries para garantir sincronização
+            // Isso força refetch de dados atualizados do servidor
+            // O useEffect será disparado com dados consistentes
+            queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['habitWeeklyLogs'] });
         },
     });
 }
@@ -173,8 +176,9 @@ export function useDeleteHabitLog() {
             });
         },
         onSuccess: () => {
-            // Não invalidar query - deixa o estado local intacto
-            // queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+            // ✅ CORREÇÃO: Invalidar AMBAS as queries para garantir sincronização
+            queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['habitWeeklyLogs'] });
         },
     });
 }

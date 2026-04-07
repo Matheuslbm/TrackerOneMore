@@ -63,9 +63,9 @@ public class HabitService : IHabitService
 
             // Buscar se já existe um Grace Day nessa semana para esse hábito
             var allLogsThisWeek = await _habitLogRepository.GetLogsByHabitIdAsync(habitId, cancellationToken);
-            var graceInWeek = allLogsThisWeek.FirstOrDefault(l => 
-                l.Status == LogStatus.GraceDay && 
-                l.Date >= startOfWeek && 
+            var graceInWeek = allLogsThisWeek.FirstOrDefault(l =>
+                l.Status == LogStatus.GraceDay &&
+                l.Date >= startOfWeek &&
                 l.Date <= endOfWeek &&
                 l.Date != request.Date // Permitir atualizar o mesmo dia
             );
@@ -138,22 +138,45 @@ public class HabitService : IHabitService
             return 0;
         }
 
-        int streak = 0;
+        // Ordenar por data DESC (mais recentes primeiro)
+        var sortedLogs = logs.OrderByDescending(l => l.Date).ToList();
 
-        foreach (var log in logs)
+        int streak = 0;
+        DateOnly? lastDate = null;
+
+        // Contar apenas os Completed consecutivos, verificando gaps entre dias
+        foreach (var log in sortedLogs)
         {
+            // Se há gap entre logs, o streak quebra
+            if (lastDate.HasValue)
+            {
+                // ✅ CORREÇÃO: Usar diferença REAL em dias entre DateOnly objetos
+                // DayNumber retorna o dia do ano (1-365), então subtrair diretamente funciona para comparar
+                // Quando ordena DESC, a diferença entre dias consecutivos deve ser exatamente 1
+                var daysDifference = lastDate.Value.DayNumber - log.Date.DayNumber;
+
+                // Se não é exatamente 1 dia de diferença, há um gap
+                if (daysDifference != 1)
+                {
+                    // Há dias faltando ou não é consecutivo, streak termina
+                    return streak;
+                }
+            }
+
             switch (log.Status)
             {
                 case LogStatus.Completed:
                     streak++;
                     break;
                 case LogStatus.GraceDay:
-                    continue;
+                    // GraceDay não quebra e não incrementa o contador
+                    break;
                 case LogStatus.Missed:
+                    // Missed quebra o streak imediatamente
                     return streak;
-                default:
-                    continue;
             }
+
+            lastDate = log.Date;
         }
 
         return streak;
