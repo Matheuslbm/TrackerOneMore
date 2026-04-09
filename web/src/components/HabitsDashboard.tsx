@@ -35,7 +35,7 @@ const HabitsDashboard = () => {
 
   const stats = [
     { label: "Hábitos Ativos", value: habits.length.toString(), icon: Target, color: "text-primary" },
-    { label: "Taxa de Conclusão", value: `${avgCompletion}%`, icon: TrendingUp, color: "text-moss-light" },
+    { label: "Taxa de Constância", value: `${avgCompletion}%`, icon: TrendingUp, color: "text-moss-light" },
     { label: "Melhor Streak", value: bestStreak.toString(), icon: Flame, color: "text-streak-fire" },
     { label: "Semana Atual", value: `${weeklyProgress}%`, icon: BarChart3, color: "text-primary" },
   ];
