@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/api/api';
-import { DashboardResponse, DashboardSummaryResponse, AnalyticsResponse } from '@/shared/types';
+import { DashboardResponse, DashboardSummaryResponse, AnalyticsResponse, MoodHabitWeeklyCorrelationResponse } from '@/shared/types';
 
 const DASHBOARD_QUERY_KEY = 'dashboard';
 const ANALYTICS_QUERY_KEY = 'analytics';
@@ -27,16 +27,17 @@ export function useDashboardSummary() {
     });
 }
 
-// Get analytics
-export function useAnalytics(startDate?: string, endDate?: string) {
+// Get analytics with mood-habit weekly correlation
+export function useAnalytics(startDate?: string, endDate?: string, weeksBack?: number) {
     return useQuery({
-        queryKey: [ANALYTICS_QUERY_KEY, startDate, endDate],
+        queryKey: [ANALYTICS_QUERY_KEY, startDate, endDate, weeksBack],
         queryFn: async () => {
-            const params: Record<string, string> = {};
+            const params: Record<string, string | number> = {};
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
+            if (weeksBack) params.weeksBack = weeksBack;
 
-            const { data } = await api.get<any>('/analytics/mood-habit-trend', { params });
+            const { data } = await api.get<MoodHabitWeeklyCorrelationResponse>('/analytics/mood-habit-trend', { params });
             return data;
         },
     });

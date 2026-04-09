@@ -9,6 +9,7 @@ import {
 } from '@/shared/types';
 
 const HABITS_QUERY_KEY = 'habits';
+const ANALYTICS_QUERY_KEY = 'analytics';
 
 // Get all habits
 export function useHabits(page = 1, pageSize = 10) {
@@ -78,6 +79,8 @@ export function useDeleteHabit(habitId: string) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['habitWeeklyLogs'] });
+            queryClient.invalidateQueries({ queryKey: [ANALYTICS_QUERY_KEY] });
         },
     });
 }
@@ -112,8 +115,16 @@ export function useWeeklyHabitLogs() {
             const endOfWeek = new Date(startOfWeek);
             endOfWeek.setDate(startOfWeek.getDate() + 6);
 
-            const startDateStr = startOfWeek.toISOString().split('T')[0];
-            const endDateStr = endOfWeek.toISOString().split('T')[0];
+            // Converter para formato YYYY-MM-DD usando data LOCAL (não UTC)
+            const getLocalDateStr = (date: Date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            const startDateStr = getLocalDateStr(startOfWeek);
+            const endDateStr = getLocalDateStr(endOfWeek);
 
             // Fazer uma única requisição para toda a semana
             const { data } = await api.get<{
@@ -129,7 +140,7 @@ export function useWeeklyHabitLogs() {
                     for (let i = 0; i < 7; i++) {
                         const date = new Date(startOfWeek);
                         date.setDate(startOfWeek.getDate() + i);
-                        dates.push(date.toISOString().split('T')[0]);
+                        dates.push(getLocalDateStr(date));
                     }
                     return dates;
                 })()
@@ -156,11 +167,11 @@ export function useLogHabit() {
             return data;
         },
         onSuccess: () => {
-            // ✅ CORREÇÃO: Invalidar AMBAS as queries para garantir sincronização
+            // ✅ CORREÇÃO: Invalidar TODAS as queries afetadas pelo novo log
             // Isso força refetch de dados atualizados do servidor
-            // O useEffect será disparado com dados consistentes
             queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
             queryClient.invalidateQueries({ queryKey: ['habitWeeklyLogs'] });
+            queryClient.invalidateQueries({ queryKey: [ANALYTICS_QUERY_KEY] });
         },
     });
 }
@@ -176,9 +187,10 @@ export function useDeleteHabitLog() {
             });
         },
         onSuccess: () => {
-            // ✅ CORREÇÃO: Invalidar AMBAS as queries para garantir sincronização
+            // ✅ CORREÇÃO: Invalidar TODAS as queries afetadas pela remoção do log
             queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
             queryClient.invalidateQueries({ queryKey: ['habitWeeklyLogs'] });
+            queryClient.invalidateQueries({ queryKey: [ANALYTICS_QUERY_KEY] });
         },
     });
 }

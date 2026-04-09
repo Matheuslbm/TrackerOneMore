@@ -74,6 +74,8 @@ namespace Tracker.Application.Services
 
         /// <summary>
         /// Convenience overload: obtém análise dos últimos N weeks
+        /// Se weeksBack=1, retorna a semana atual (seg a dom)
+        /// Se weeksBack=2, retorna as últimas 2 semanas, etc
         /// </summary>
         public async Task<MoodHabitWeeklyCorrelationResponse> GetWeeklyMoodHabitCorrelationAsync(
             Guid userId,
@@ -83,10 +85,22 @@ namespace Tracker.Application.Services
             if (weeksBack < 1 || weeksBack > 52)
                 throw new ArgumentException("weeksBack deve estar entre 1 e 52", nameof(weeksBack));
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var startDate = today.AddDays(-(weeksBack * 7) + 1);
+            // ✅ CORREÇÃO: Usar DateTime.Now (local) ao invés de UtcNow
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            
+            // Calcular o início da semana ATUAL (segunda-feira)
+            var dayOfWeek = (int)today.DayOfWeek;
+            var dayOffsetFromMonday = dayOfWeek == 0 ? 6 : dayOfWeek - 1;
+            var startOfCurrentWeek = today.AddDays(-dayOffsetFromMonday);
+            var endOfCurrentWeek = startOfCurrentWeek.AddDays(6);
+            
+            // Se weeksBack = 1, pega a semana atual (seg a dom)
+            // Se weeksBack = 2, retrocede mais 1 semana (quer dizer 2 últimas semanas completas)
+            // etc.
+            var startDate = startOfCurrentWeek.AddDays(-((weeksBack - 1) * 7));
+            var endDate = endOfCurrentWeek;
 
-            return await GetWeeklyMoodHabitCorrelationAsync(userId, startDate, today, cancellationToken);
+            return await GetWeeklyMoodHabitCorrelationAsync(userId, startDate, endDate, cancellationToken);
         }
 
         /// <summary>
@@ -131,6 +145,31 @@ namespace Tracker.Application.Services
                     weekHabitLogs.AddRange(logs.Where(l => l.Date >= currentDate && l.Date <= weekEnd));
                 }
 
+                // Calcular taxa de conclusão por hábito levando em conta o TargetDaysPerWeek
+                var completionRates = new List<double>();
+                foreach (var habit in habits)
+                {
+                    // Contar logs completados deste hábito nesta semana
+                    var habitCompletedLogs = 0;
+                    if (habitLogsPerHabit.ContainsKey(habit.Id))
+                    {
+                        habitCompletedLogs = habitLogsPerHabit[habit.Id]
+                            .Count(l => l.Date >= currentDate && l.Date <= weekEnd && l.Status == LogStatus.Completed);
+                    }
+
+                    // Calcular taxa para TODOS os hábitos, inclusive os sem atividade (que resultarão em 0%)
+                    var targetDays = habit.TargetDaysPerWeek ?? 7; // Padrão: 7 dias/semana
+                    var habitRate = (habitCompletedLogs / (double)targetDays) * 100;
+                    
+                    // Limitar a 100% (pode ter mais de 1 log por dia se o usuário registro múltiplas vezes)
+                    completionRates.Add(Math.Min(habitRate, 100));
+                }
+
+                // Calcular a média das taxas de todos os hábitos que tiveram atividade
+                var habitCompletionRate = completionRates.Any() 
+                    ? completionRates.Average()
+                    : 0;
+
                 var completedCount = weekHabitLogs.Count(l => l.Status == LogStatus.Completed);
                 var daysWithCompleted = weekHabitLogs
                     .Where(l => l.Status == LogStatus.Completed)
@@ -148,7 +187,7 @@ namespace Tracker.Application.Services
                     AverageMood = weekMoods.Any() ? weekMoods.Average(m => (int)m.Level) : null,
                     TotalHabitsCompleted = completedCount,
                     AverageStreak = CalculateAverageStreak(habits, currentDate, weekEnd),
-                    HabitCompletionRate = CalculateCompletionRate(completedCount, 7),
+                    HabitCompletionRate = habitCompletionRate,
                     DaysWithCompletedHabits = daysWithCompleted
                 });
 

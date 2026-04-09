@@ -175,7 +175,12 @@ const HabitGrid = () => {
 
       const date = new Date(startOfWeek);
       date.setDate(startOfWeek.getDate() + dayIndex);
-      const dateStr = date.toISOString().split("T")[0];
+      
+      // Converter para formato YYYY-MM-DD usando data LOCAL (não UTC)
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const logKey = `${habitId}-${dateStr}`;
 
       // Ciclar entre os estados: Nada → Completed -> Missed -> Grace -> (delete)
@@ -213,6 +218,14 @@ const HabitGrid = () => {
       // Criar novo timeout com debounce
       debounceTimerRef.current[timerKey] = setTimeout(async () => {
         try {
+          // ✅ DEBUG: Log para rastrear o que está sendo enviado
+          console.log(`📤 ENVIANDO LOG:`, {
+            habitId,
+            date: dateStr,
+            status: nextStatus,
+            operation: nextStatus === null ? "DELETE" : "CREATE_OR_UPDATE"
+          });
+          
           // Fazer a requisição apenas após a espera
           if (nextStatus === null) {
             await deleteHabitLogMutation.mutateAsync({
@@ -231,6 +244,16 @@ const HabitGrid = () => {
         } catch (error: any) {
           // Extrair mensagem de erro personalizada do backend
           const errorMessage = error.response?.data?.error || error.message || "Erro ao registrar hábito";
+          
+          // ✅ DEBUG: Log de erro detalhado
+          console.error(`❌ ERRO AO ENVIAR LOG:`, {
+            habitId,
+            dateStr,
+            status: nextStatus,
+            error: errorMessage,
+            fullError: error
+          });
+          
           toast.error(errorMessage);
 
           // ✋ Se tentou logar um Grace e foi rejeitado (erro contém "Curingas"), deixar o dia vazio
@@ -424,7 +447,7 @@ const HabitGrid = () => {
               </div>
 
               {/* Day buttons - placeholder for now, ideally would fetch weekly data */}
-              {dayLabels.map((_, di) => {
+              {dayLabels.map((dayLabel, di) => {
                 // MESMA LÓGICA DO HOOK useWeeklyHabitLogs
                 const today = new Date();
                 const dayOfWeek = today.getDay();
@@ -434,9 +457,19 @@ const HabitGrid = () => {
 
                 const date = new Date(startOfWeek);
                 date.setDate(startOfWeek.getDate() + di);
-                const dateStr = date.toISOString().split("T")[0];
+                
+                // Converter para formato YYYY-MM-DD usando data LOCAL (não UTC)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
                 const logKey = `${habit.id}-${dateStr}`;
                 const status = habitLogs[logKey];
+
+                // ✅ DEBUG: Log dos dias sendo renderizados
+                if (hi === 0) { // Log apenas uma vez por linha (primeira habit)
+                  console.log(`🗓️ DIA ${di}: ${dayLabel} = ${dateStr}`);
+                }
 
                 const statusColor =
                   status === "Completed" ? "bg-primary border-primary" :

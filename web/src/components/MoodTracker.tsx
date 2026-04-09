@@ -29,9 +29,21 @@ const MoodTracker = () => {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
 
+  // Converter weekStart para string no formato LOCAL
+  const weekStartYear = weekStart.getFullYear();
+  const weekStartMonth = String(weekStart.getMonth() + 1).padStart(2, '0');
+  const weekStartDay = String(weekStart.getDate()).padStart(2, '0');
+  const weekStartStr = `${weekStartYear}-${weekStartMonth}-${weekStartDay}`;
+
+  // Converter weekEnd para string no formato LOCAL
+  const weekEndYear = weekEnd.getFullYear();
+  const weekEndMonth = String(weekEnd.getMonth() + 1).padStart(2, '0');
+  const weekEndDay = String(weekEnd.getDate()).padStart(2, '0');
+  const weekEndStr = `${weekEndYear}-${weekEndMonth}-${weekEndDay}`;
+
   const { data: moods = [], isLoading, isFetching, refetch } = useMoods(
-    weekStart.toISOString().split("T")[0],
-    weekEnd.toISOString().split("T")[0]
+    weekStartStr,
+    weekEndStr
   );
   const logMoodMutation = useLogMood();
 
@@ -102,7 +114,10 @@ const MoodTracker = () => {
     try {
       const dateToSet = new Date(weekStart);
       dateToSet.setDate(dateToSet.getDate() + dayIndex);
-      const dateStr = dateToSet.toISOString().split("T")[0];
+      const year = dateToSet.getFullYear();
+      const month = String(dateToSet.getMonth() + 1).padStart(2, '0');
+      const day = String(dateToSet.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
 
       // Atualizar estado local imediatamente para feedback visual
       setLocalMoodMap(prev => ({ ...prev, [dateStr]: level }));
@@ -120,7 +135,10 @@ const MoodTracker = () => {
         const copy = { ...prev };
         const dateToSet = new Date(weekStart);
         dateToSet.setDate(dateToSet.getDate() + dayIndex);
-        const dateStr = dateToSet.toISOString().split("T")[0];
+        const year = dateToSet.getFullYear();
+        const month = String(dateToSet.getMonth() + 1).padStart(2, '0');
+        const day = String(dateToSet.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         delete copy[dateStr];
         return copy;
       });
@@ -156,7 +174,10 @@ const MoodTracker = () => {
         {dayLabels.map((day, di) => {
           const dateForDay = new Date(weekStart);
           dateForDay.setDate(dateForDay.getDate() + di);
-          const dateStr = dateForDay.toISOString().split("T")[0];
+          const year = dateForDay.getFullYear();
+          const month = String(dateForDay.getMonth() + 1).padStart(2, '0');
+          const dayStr = String(dateForDay.getDate()).padStart(2, '0');
+          const dateStr = `${year}-${month}-${dayStr}`;
           const moodForDay = moodMap[dateStr];
 
           return (

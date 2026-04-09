@@ -28,14 +28,22 @@ const Challenge = () => {
     }
 
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+      
       const targetDate = new Date();
       targetDate.setDate(targetDate.getDate() + newDuration);
-      const targetDateStr = targetDate.toISOString().split("T")[0];
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const targetDay = String(targetDate.getDate()).padStart(2, '0');
+      const targetDateStr = `${targetYear}-${targetMonth}-${targetDay}`;
 
       await createChallengeMutation.mutateAsync({
         title: newName.trim(),
-        startDate: today,
+        startDate: todayStr,
         targetEndDate: targetDateStr,
       });
 
@@ -50,12 +58,16 @@ const Challenge = () => {
 
   const handleLogChallenge = async (challengeId: string) => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
       const difficulty = (selectedDifficulty[challengeId] || "Easy") as "Easy" | "Medium" | "Hard";
 
       await logChallengeMutation.mutateAsync({
         challengeId,
-        date: today,
+        date: todayStr,
         difficulty,
       });
 

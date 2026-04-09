@@ -79,7 +79,7 @@ namespace Tracker.Application.Services
         /// </summary>
         private async Task<int?> GetTodaysMoodLevelAsync(Guid userId, CancellationToken cancellationToken)
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(DateTime.Now);
             var mood = await _moodRepository.GetByDateAsync(userId, today, cancellationToken);
             return mood != null ? (int)mood.Level : null;
         }
@@ -116,7 +116,7 @@ namespace Tracker.Application.Services
         /// </summary>
         private async Task<bool> IsHabitCompletedTodayAsync(Guid habitId, CancellationToken cancellationToken)
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(DateTime.Now);
             var todayLog = await _habitLogRepository.GetLogByDateAsync(habitId, today, cancellationToken);
 
             // Considera completado se o log existe e tem status de completado
@@ -165,7 +165,7 @@ namespace Tracker.Application.Services
             var sortedLogs = logs.OrderByDescending(l => l.Date).ToList();
 
             int streak = 0;
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(DateTime.Now);
             var expectedDate = today;
 
             foreach (var log in sortedLogs)
@@ -201,7 +201,7 @@ namespace Tracker.Application.Services
         /// </summary>
         private int CalculateDaysRemaining(DateOnly targetEndDate)
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(DateTime.Now);
             var remaining = (targetEndDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)).Days;
             return remaining >= 0 ? remaining : 0;
         }
@@ -213,8 +213,8 @@ namespace Tracker.Application.Services
         /// </summary>
         private async Task<IEnumerable<ContributionDataResponse>> GenerateContributionDataAsync(Guid userId, CancellationToken cancellationToken)
         {
-            var oneYearAgo = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-365));
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var oneYearAgo = DateOnly.FromDateTime(DateTime.Now.AddDays(-365));
+            var today = DateOnly.FromDateTime(DateTime.Now);
 
             // Buscar todos os logs de hábitos do usuário no período
             var userHabits = await _habitRepository.GetAllByUserIdAsync(userId, cancellationToken);

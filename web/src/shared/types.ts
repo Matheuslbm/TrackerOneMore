@@ -133,6 +133,37 @@ export interface PagedResponse<T> {
 }
 
 // Analytics Types
+export interface WeeklyTrendResponse {
+    weekNumber: number;
+    startDate: string; // ISO date YYYY-MM-DD
+    endDate: string; // ISO date YYYY-MM-DD
+    averageMood: number | null;
+    totalHabitsCompleted: number;
+    averageStreak: number;
+    habitCompletionRate: number; // percentage 0-100
+    daysWithCompletedHabits: number;
+}
+
+export interface OverallAnalyticsStatsResponse {
+    averageMoodAllPeriod: number | null;
+    averageCompletionRate: number;
+    bestWeek: WeeklyTrendResponse | null;
+    worstWeek: WeeklyTrendResponse | null;
+    totalWeeks: number;
+    totalHabitsCompletedAllPeriod: number;
+}
+
+export interface MoodHabitWeeklyCorrelationResponse {
+    period: {
+        startDate: string; // ISO date YYYY-MM-DD
+        endDate: string; // ISO date YYYY-MM-DD
+        totalDays: number;
+        totalWeeks: number;
+    };
+    overallStats: OverallAnalyticsStatsResponse;
+    weeklyTrends: WeeklyTrendResponse[];
+}
+
 export interface AnalyticsResponse {
     habitConsistency: {
         habitId: string;

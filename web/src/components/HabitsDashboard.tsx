@@ -15,7 +15,7 @@ const HabitsDashboard = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: habitsData, isLoading: habitsLoading } = useHabits(1, 100);
-  const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics();
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics(undefined, undefined, 1);
 
   const scrollTo = (dir: number) => {
     const next = Math.max(0, Math.min(dashViews.length - 1, activeView + dir));
@@ -27,7 +27,11 @@ const HabitsDashboard = () => {
   const avgCompletion = habits.length > 0
     ? Math.round((habits.filter(h => h.currentStreak > 0).length / habits.length) * 100)
     : 0;
-  const weeklyProgress = 85; // Placeholder - será calculado a partir dos dados semanais
+  
+  // Get current week completion rate from analytics data
+  const weeklyProgress = analyticsData?.weeklyTrends && analyticsData.weeklyTrends.length > 0
+    ? Math.round(analyticsData.weeklyTrends[analyticsData.weeklyTrends.length - 1].habitCompletionRate)
+    : 0;
 
   const stats = [
     { label: "Hábitos Ativos", value: habits.length.toString(), icon: Target, color: "text-primary" },
