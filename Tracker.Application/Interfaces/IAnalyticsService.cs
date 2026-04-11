@@ -33,5 +33,33 @@ namespace Tracker.Application.Interfaces
             Guid userId,
             int weeksBack,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Obtém performance detalhada de cada hábito em um período
+        /// Inclui taxa de conclusão individual, logs diários e correlação com humor
+        /// Ideal para visualizar gráficos de desempenho por hábito
+        /// </summary>
+        /// <param name="userId">ID do usuário autenticado</param>
+        /// <param name="startDate">Data inicial do período (inclusive)</param>
+        /// <param name="endDate">Data final do período (inclusive)</param>
+        /// <param name="cancellationToken">Token de cancelamento</param>
+        /// <returns>Performance de cada hábito com dados diários</returns>
+        Task<HabitsPerformancePeriodResponse> GetHabitsPerformanceAsync(
+            Guid userId,
+            DateOnly startDate,
+            DateOnly endDate,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Convenience overload: obtém performance dos últimos N weeks
+        /// </summary>
+        /// <param name="userId">ID do usuário autenticado</param>
+        /// <param name="weeksBack">Número de semanas para retroceder (1-52)</param>
+        /// <param name="cancellationToken">Token de cancelamento</param>
+        /// <returns>Performance de cada hábito nos últimos N weeks</returns>
+        Task<HabitsPerformancePeriodResponse> GetHabitsPerformanceAsync(
+            Guid userId,
+            int weeksBack,
+            CancellationToken cancellationToken = default);
     }
 }

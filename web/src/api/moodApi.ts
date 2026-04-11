@@ -68,10 +68,19 @@ export function useLogMood() {
             return data;
         },
         onSuccess: (data) => {
-            // Invalidar e refetch todas as queries de mood
+            // Invalidar queries de mood
             queryClient.invalidateQueries({ queryKey: [MOOD_QUERY_KEY] });
-            // Garanta que o refetch aconteça imediatamente
+            // Invalidar queries de analytics (mood-habit-trend)
+            queryClient.invalidateQueries({ queryKey: ['analytics'] });
+            // Invalidar queries de performance de hábitos
+            queryClient.invalidateQueries({ queryKey: ['habits-performance'] });
+            // Invalidar dashboard
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            // Garantir refetch imediato
             queryClient.refetchQueries({ queryKey: [MOOD_QUERY_KEY] });
+            queryClient.refetchQueries({ queryKey: ['analytics'] });
+            queryClient.refetchQueries({ queryKey: ['habits-performance'] });
+            queryClient.refetchQueries({ queryKey: ['dashboard'] });
         },
     });
 }
@@ -85,7 +94,14 @@ export function useDeleteMood(date: string) {
             await api.delete(`/moods/${date}`);
         },
         onSuccess: () => {
+            // Invalidar queries de mood
             queryClient.invalidateQueries({ queryKey: [MOOD_QUERY_KEY] });
+            // Invalidar queries de analytics (mood-habit-trend)
+            queryClient.invalidateQueries({ queryKey: ['analytics'] });
+            // Invalidar queries de performance de hábitos
+            queryClient.invalidateQueries({ queryKey: ['habits-performance'] });
+            // Invalidar dashboard
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         },
     });
 }

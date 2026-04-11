@@ -172,6 +172,8 @@ export function useLogHabit() {
             queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
             queryClient.invalidateQueries({ queryKey: ['habitWeeklyLogs'] });
             queryClient.invalidateQueries({ queryKey: [ANALYTICS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['habits-performance'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         },
     });
 }
@@ -191,6 +193,8 @@ export function useDeleteHabitLog() {
             queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
             queryClient.invalidateQueries({ queryKey: ['habitWeeklyLogs'] });
             queryClient.invalidateQueries({ queryKey: [ANALYTICS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['habits-performance'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         },
     });
 }

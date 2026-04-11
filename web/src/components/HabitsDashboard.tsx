@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Flame, TrendingUp, BarChart3, Target, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useHabits } from "@/api/habitsApi";
-import { useAnalytics } from "@/api/dashboardApi";
+import { useAnalytics, useHabitsPerformance } from "@/api/dashboardApi";
 
 const dashViews = [
   { id: "performance", title: "Desempenho por Hábito" },
@@ -16,6 +16,7 @@ const HabitsDashboard = () => {
 
   const { data: habitsData, isLoading: habitsLoading } = useHabits(1, 100);
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics(undefined, undefined, 1);
+  const { data: performanceData, isLoading: performanceLoading } = useHabitsPerformance(undefined, undefined, 1);
 
   const scrollTo = (dir: number) => {
     const next = Math.max(0, Math.min(dashViews.length - 1, activeView + dir));
@@ -40,15 +41,35 @@ const HabitsDashboard = () => {
     { label: "Semana Atual", value: `${weeklyProgress}%`, icon: BarChart3, color: "text-primary" },
   ];
 
-  // Transform habit data for display
-  const habitBreakdown = habits.map((h) => ({
-    name: h.name,
-    pct: 0, // Será preenchido com dados reais quando houver logs
-    streak: h.currentStreak || 0,
-    mood: 0, // Será preenchido com dados de analytics
+  // Transform habit performance data for display
+  const habitBreakdown = (performanceData?.habitPerformances || []).map((h) => ({
+    name: h.habitName,
+    pct: Math.round(h.completionRate),
+    streak: h.currentStreak,
+    mood: 0, // Será agregado a partir dos dailyLogs
+    dailyLogs: h.dailyLogs || [],
   }));
 
-  const isLoading = habitsLoading || analyticsLoading;
+  // Prepare daily mood and habit data structure (7 days of week)
+  const daysOfWeek = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  const dailyData = Array.from({ length: 7 }, (_, dayIndex) => {
+    const allHabitsForDay = habitBreakdown.flatMap(h => {
+      const log = h.dailyLogs.find(l => l.dayOfWeek === dayIndex + 1);
+      return log && log.status === "Completed" ? 1 : 0;
+    });
+
+    const allMoodsForDay = habitBreakdown.flatMap(h => {
+      const log = h.dailyLogs.find(l => l.dayOfWeek === dayIndex + 1);
+      return log?.moodLevel ? [log.moodLevel] : [];
+    });
+
+    const habitsHeight = allHabitsForDay.length > 0 ? Math.min(100, (allHabitsForDay.reduce((a, b) => a + b, 0) / habitBreakdown.length) * 100) : 0;
+    const moodHeight = allMoodsForDay.length > 0 ? (allMoodsForDay.reduce((a, b) => a + b, 0) / allMoodsForDay.length / 5) * 100 : 0;
+
+    return { day: daysOfWeek[dayIndex], habits: habitsHeight, mood: moodHeight };
+  });
+
+  const isLoading = habitsLoading || analyticsLoading || performanceLoading;
 
   if (isLoading) {
     return (
@@ -108,7 +129,7 @@ const HabitsDashboard = () => {
                     <div className="flex-1 h-2.5 rounded-full bg-muted/40 overflow-hidden">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${h.pct}%` }} transition={{ duration: 0.6, delay: 0.1 }} className="h-full rounded-full bg-primary" />
                     </div>
-                    <span className="text-xs text-muted-foreground w-10 text-right">{Math.round(h.pct)}%</span>
+                    <span className="text-xs text-muted-foreground w-10 text-right">{h.pct}%</span>
                     <div className="flex items-center gap-1 w-14 justify-end">
                       <Flame className="h-3.5 w-3.5 text-streak-fire" />
                       <span className="text-xs font-display font-bold text-foreground">{h.streak}</span>
@@ -124,14 +145,14 @@ const HabitsDashboard = () => {
           {activeView === 1 && (
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-7 gap-2">
-                {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day, i) => {
+                {dailyData.map((day) => {
                   return (
-                    <div key={day} className="flex flex-col items-center gap-2">
+                    <div key={day.day} className="flex flex-col items-center gap-2">
                       <div className="h-24 w-full rounded-lg bg-muted/30 flex items-end gap-0.5 overflow-hidden p-0.5">
-                        <div className="flex-1 rounded-sm bg-primary/70" style={{ height: '0%' }} />
-                        <div className="flex-1 rounded-sm bg-streak-fire/60" style={{ height: '0%' }} />
+                        <div className="flex-1 rounded-sm bg-primary/70" style={{ height: `${day.habits}%` }} />
+                        <div className="flex-1 rounded-sm bg-streak-fire/60" style={{ height: `${day.mood}%` }} />
                       </div>
-                      <span className="font-display text-[10px] text-muted-foreground">{day}</span>
+                      <span className="font-display text-[10px] text-muted-foreground">{day.day}</span>
                     </div>
                   );
                 })}
@@ -140,27 +161,41 @@ const HabitsDashboard = () => {
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-primary/70" />Hábitos</span>
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-streak-fire/60" />Humor</span>
               </div>
-              <p className="text-center text-muted-foreground text-sm py-4">Dados será carregados quando houver registros</p>
+              {performanceData?.habitPerformances && performanceData.habitPerformances.length > 0 ? (
+                <div className="text-center text-[11px] text-muted-foreground">
+                  Período: {new Date(performanceData.period.startDate).toLocaleDateString('pt-BR')} a {new Date(performanceData.period.endDate).toLocaleDateString('pt-BR')}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground text-sm py-4">Dados será carregados quando houver registros</p>
+              )}
             </div>
           )}
 
           {activeView === 2 && (
             <div className="flex flex-col gap-3">
               {habitBreakdown.length > 0 ? (
-                habitBreakdown.map((h) => (
-                  <div key={h.name} className="flex items-center gap-3">
-                    <span className="text-sm text-foreground w-24 truncate">{h.name}</span>
-                    <div className="flex-1 flex items-center gap-2">
-                      <div className="flex-1 h-2.5 rounded-full bg-muted/40 overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${h.pct}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full bg-primary" />
+                habitBreakdown.map((h) => {
+                  // Calcular mood médio para este hábito
+                  const moodLogs = h.dailyLogs.filter(l => l.moodLevel);
+                  const avgMood = moodLogs.length > 0 
+                    ? moodLogs.reduce((sum, log) => sum + (log.moodLevel || 0), 0) / moodLogs.length
+                    : 0;
+
+                  return (
+                    <div key={h.name} className="flex items-center gap-3">
+                      <span className="text-sm text-foreground w-24 truncate">{h.name}</span>
+                      <div className="flex-1 flex items-center gap-2">
+                        <div className="flex-1 h-2.5 rounded-full bg-muted/40 overflow-hidden">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${h.pct}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full bg-primary" />
+                        </div>
+                        <div className="w-16 h-2.5 rounded-full bg-muted/40 overflow-hidden">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${(avgMood / 5) * 100}%` }} transition={{ duration: 0.6, delay: 0.1 }} className="h-full rounded-full bg-streak-fire/60" />
+                        </div>
                       </div>
-                      <div className="w-16 h-2.5 rounded-full bg-muted/40 overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${(h.mood / 5) * 100}%` }} transition={{ duration: 0.6, delay: 0.1 }} className="h-full rounded-full bg-streak-fire/60" />
-                      </div>
+                      <span className="text-[11px] text-muted-foreground w-16 text-right">😊 {avgMood.toFixed(1)}</span>
                     </div>
-                    <span className="text-[11px] text-muted-foreground w-16 text-right">😊 {h.mood.toFixed(1)}</span>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-center text-muted-foreground py-4">Nenhum hábito registrado</p>
               )}

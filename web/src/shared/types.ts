@@ -144,6 +144,39 @@ export interface WeeklyTrendResponse {
     daysWithCompletedHabits: number;
 }
 
+export interface DailyHabitLogResponse {
+    date: string; // ISO date YYYY-MM-DD
+    status: string | null; // "Completed", "Missed", "GraceDay"
+    moodLevel: number | null; // 1-5
+    dayOfWeek: number; // 1=seg, 7=dom
+}
+
+export interface HabitPerformanceResponse {
+    habitId: string;
+    habitName: string;
+    habitType: string; // "Daily" ou "WeeklyTarget"
+    completionRate: number; // percentage 0-100
+    currentStreak: number;
+    dailyLogs: DailyHabitLogResponse[];
+    totalCompleted: number;
+    daysWithLogs: number;
+    expectedDays: number;
+}
+
+export interface HabitsPerformancePeriodResponse {
+    period: {
+        startDate: string; // ISO date YYYY-MM-DD
+        endDate: string; // ISO date YYYY-MM-DD
+        totalDays: number;
+        totalWeeks: number;
+    };
+    habitPerformances: HabitPerformanceResponse[];
+    averageCompletionRate: number;
+    averageMoodLevel: number | null;
+    totalHabits: number;
+    habitsWithActivity: number;
+}
+
 export interface OverallAnalyticsStatsResponse {
     averageMoodAllPeriod: number | null;
     averageCompletionRate: number;

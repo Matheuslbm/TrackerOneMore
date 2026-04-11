@@ -276,5 +276,222 @@ namespace Tracker.Application.Services
                 TotalHabitsCompletedAllPeriod = weeklyTrends.Sum(w => w.TotalHabitsCompleted)
             };
         }
+
+        /// <summary>
+        /// Obtém performance detalhada de cada hábito em um período
+        /// Inclui taxa de conclusão individual, logs diários e correlação com humor
+        /// </summary>
+        public async Task<HabitsPerformancePeriodResponse> GetHabitsPerformanceAsync(
+            Guid userId,
+            DateOnly startDate,
+            DateOnly endDate,
+            CancellationToken cancellationToken = default)
+        {
+            ValidateDateRange(startDate, endDate);
+
+            // Coletar dados base
+            var habits = await _habitRepository.GetAllByUserIdAsync(userId, cancellationToken);
+            var moods = await _moodService.GetMoodsByDateRangeAsync(userId, startDate, endDate, cancellationToken);
+            var moodsList = moods.ToList();
+            var moodDict = moodsList.ToDictionary(m => m.Date, m => (int)m.Level);
+
+            // Coletar logs de hábitos
+            var habitLogsPerHabit = new Dictionary<Guid, List<HabitLog>>();
+            foreach (var habit in habits)
+            {
+                var logs = await _habitLogRepository.GetLogsByHabitIdAsync(habit.Id, cancellationToken);
+                var logsInRange = logs?
+                    .Where(l => l.Date >= startDate && l.Date <= endDate)
+                    .ToList() ?? new List<HabitLog>();
+                habitLogsPerHabit[habit.Id] = logsInRange;
+            }
+
+            // Calcular performance por hábito
+            var habitPerformances = new List<HabitPerformanceResponse>();
+            foreach (var habit in habits)
+            {
+                var performance = CalculateHabitPerformance(
+                    habit,
+                    startDate,
+                    endDate,
+                    habitLogsPerHabit[habit.Id],
+                    moodDict);
+
+                habitPerformances.Add(performance);
+            }
+
+            // Calcular estatísticas agregadas
+            var avgCompletionRate = habitPerformances.Any() 
+                ? habitPerformances.Average(h => h.CompletionRate)
+                : 0;
+            
+            var avgMood = moodsList.Any() 
+                ? moodsList.Average(m => (int)m.Level)
+                : (double?)null;
+
+            var habitsWithActivity = habitPerformances.Count(h => h.TotalCompleted > 0);
+
+            var totalDays = (endDate.ToDateTime(TimeOnly.MinValue) - startDate.ToDateTime(TimeOnly.MinValue)).Days + 1;
+            var weeks = (totalDays + 6) / 7; // Arredonda para cima
+
+            return new HabitsPerformancePeriodResponse
+            {
+                Period = new HabitsPerformancePeriodResponse.PeriodInfoResponse
+                {
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    TotalDays = totalDays,
+                    TotalWeeks = weeks
+                },
+                HabitPerformances = habitPerformances.OrderByDescending(h => h.CompletionRate),
+                AverageCompletionRate = avgCompletionRate,
+                AverageMoodLevel = avgMood,
+                TotalHabits = habits.Count(),
+                HabitsWithActivity = habitsWithActivity
+            };
+        }
+
+        /// <summary>
+        /// Convenience overload: obtém performance dos últimos N weeks
+        /// </summary>
+        public async Task<HabitsPerformancePeriodResponse> GetHabitsPerformanceAsync(
+            Guid userId,
+            int weeksBack,
+            CancellationToken cancellationToken = default)
+        {
+            if (weeksBack < 1 || weeksBack > 52)
+                throw new ArgumentException("weeksBack deve estar entre 1 e 52", nameof(weeksBack));
+
+            // Usar DateTime.Now (local) ao invés de UtcNow
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            
+            // Calcular o início da semana ATUAL (segunda-feira)
+            var dayOfWeek = (int)today.DayOfWeek;
+            var dayOffsetFromMonday = dayOfWeek == 0 ? 6 : dayOfWeek - 1;
+            var startOfCurrentWeek = today.AddDays(-dayOffsetFromMonday);
+            var endOfCurrentWeek = startOfCurrentWeek.AddDays(6);
+            
+            var startDate = startOfCurrentWeek.AddDays(-((weeksBack - 1) * 7));
+            var endDate = endOfCurrentWeek;
+
+            return await GetHabitsPerformanceAsync(userId, startDate, endDate, cancellationToken);
+        }
+
+        /// <summary>
+        /// Calcula a performance de um hábito específico em um período
+        /// </summary>
+        private HabitPerformanceResponse CalculateHabitPerformance(
+            Habit habit,
+            DateOnly startDate,
+            DateOnly endDate,
+            List<HabitLog> logsInRange,
+            Dictionary<DateOnly, int> moodDict)
+        {
+            var dailyLogs = new List<HabitPerformanceResponse.DailyHabitLogResponse>();
+            var completedCount = 0;
+            var loggedDaysCount = 0;
+            var expectedDays = CalculateExpectedDays(habit, startDate, endDate);
+
+            // Iterar por cada dia do período
+            for (var date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                var dayOfWeek = (int)date.DayOfWeek;
+                if (dayOfWeek == 0) dayOfWeek = 7; // Sunday = 7
+
+                var log = logsInRange.FirstOrDefault(l => l.Date == date);
+                var status = log?.Status.ToString() ?? null;
+                var moodLevel = moodDict.ContainsKey(date) ? moodDict[date] : (int?)null;
+
+                if (log != null)
+                {
+                    loggedDaysCount++;
+                    if (log.Status == LogStatus.Completed)
+                        completedCount++;
+                }
+
+                dailyLogs.Add(new HabitPerformanceResponse.DailyHabitLogResponse
+                {
+                    Date = date,
+                    Status = status,
+                    MoodLevel = moodLevel,
+                    DayOfWeek = dayOfWeek
+                });
+            }
+
+            // Calcular taxa de conclusão
+            var completionRate = expectedDays > 0
+                ? (completedCount / (double)expectedDays) * 100
+                : 0;
+
+            // Calcular streak atual do hábito
+            var streak = CalculateCurrentStreakForPeriod(logsInRange);
+
+            return new HabitPerformanceResponse
+            {
+                HabitId = habit.Id,
+                HabitName = habit.Name,
+                HabitType = habit.Type.ToString(),
+                CompletionRate = Math.Min(completionRate, 100), // Limitar a 100%
+                CurrentStreak = streak,
+                DailyLogs = dailyLogs,
+                TotalCompleted = completedCount,
+                DaysWithLogs = loggedDaysCount,
+                ExpectedDays = expectedDays
+            };
+        }
+
+        /// <summary>
+        /// Calcula o número de dias esperados para um hábito em um período
+        /// Baseado em TargetDaysPerWeek (para hábitos semanais)
+        /// </summary>
+        private int CalculateExpectedDays(Habit habit, DateOnly startDate, DateOnly endDate)
+        {
+            var totalDays = (endDate.ToDateTime(TimeOnly.MinValue) - startDate.ToDateTime(TimeOnly.MinValue)).Days + 1;
+            
+            if (habit.Type == HabitType.Daily)
+            {
+                return totalDays;
+            }
+            else if (habit.Type == HabitType.WeeklyTarget)
+            {
+                var weeks = (totalDays + 6) / 7; // Arredonda para cima
+                var targetDaysPerWeek = habit.TargetDaysPerWeek ?? 7;
+                return weeks * targetDaysPerWeek;
+            }
+
+            return totalDays;
+        }
+
+        /// <summary>
+        /// Calcula o streak atual considerando apenas logs no período especificado
+        /// </summary>
+        private int CalculateCurrentStreakForPeriod(List<HabitLog> logsInPeriod)
+        {
+            if (!logsInPeriod.Any())
+                return 0;
+
+            var sortedLogs = logsInPeriod.OrderByDescending(l => l.Date).ToList();
+            var streak = 0;
+            var lastDate = (DateOnly?)null;
+
+            foreach (var log in sortedLogs)
+            {
+                if (log.Status != LogStatus.Completed && log.Status != LogStatus.GraceDay)
+                    break;
+
+                if (lastDate == null || lastDate.Value.AddDays(-1) == log.Date || lastDate == log.Date)
+                {
+                    if (log.Status == LogStatus.Completed)
+                        streak++;
+                    lastDate = log.Date;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return streak;
+        }
     }
 }
