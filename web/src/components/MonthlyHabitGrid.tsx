@@ -178,8 +178,8 @@ const MonthlyHabitGrid = () => {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: (hi * daysInMonth + di) * 0.005, duration: 0.15 }}
                         className={`flex-1 aspect-square min-w-[16px] rounded-[4px] flex items-center justify-center ${cls} ${
-                          isToday ? "ring-1 ring-streak-fire" : ""
-                        } transition-all hover:ring-1 hover:ring-foreground/30`}
+                          isToday ? "ring-1 ring-inset ring-streak-fire" : ""
+                        } transition-all hover:ring-1 hover:ring-inset hover:ring-foreground/30`}
                         title={`${h.name} — dia ${day}`}
                       >
                         {icon}
