@@ -218,14 +218,6 @@ const HabitGrid = () => {
       // Criar novo timeout com debounce
       debounceTimerRef.current[timerKey] = setTimeout(async () => {
         try {
-          // ✅ DEBUG: Log para rastrear o que está sendo enviado
-          console.log(`📤 ENVIANDO LOG:`, {
-            habitId,
-            date: dateStr,
-            status: nextStatus,
-            operation: nextStatus === null ? "DELETE" : "CREATE_OR_UPDATE"
-          });
-          
           // Fazer a requisição apenas após a espera
           if (nextStatus === null) {
             await deleteHabitLogMutation.mutateAsync({
@@ -244,15 +236,6 @@ const HabitGrid = () => {
         } catch (error: any) {
           // Extrair mensagem de erro personalizada do backend
           const errorMessage = error.response?.data?.error || error.message || "Erro ao registrar hábito";
-          
-          // ✅ DEBUG: Log de erro detalhado
-          console.error(`❌ ERRO AO ENVIAR LOG:`, {
-            habitId,
-            dateStr,
-            status: nextStatus,
-            error: errorMessage,
-            fullError: error
-          });
           
           toast.error(errorMessage);
 
@@ -465,11 +448,6 @@ const HabitGrid = () => {
                 const dateStr = `${year}-${month}-${day}`;
                 const logKey = `${habit.id}-${dateStr}`;
                 const status = habitLogs[logKey];
-
-                // ✅ DEBUG: Log dos dias sendo renderizados
-                if (hi === 0) { // Log apenas uma vez por linha (primeira habit)
-                  console.log(`🗓️ DIA ${di}: ${dayLabel} = ${dateStr}`);
-                }
 
                 const statusColor =
                   status === "Completed" ? "bg-primary border-primary" :

@@ -15,6 +15,7 @@ const emojiMap: Record<LogLevel, string> = {
 };
 
 const log = (level: LogLevel, context: string, message: string, data?: any) => {
+  if (!import.meta.env.DEV) return;
   const timestamp = new Date().toLocaleTimeString('pt-BR');
   const emoji = emojiMap[level];
   const color = colorMap[level];
