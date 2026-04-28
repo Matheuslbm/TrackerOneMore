@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import HabitGrid from "@/components/HabitGrid";
 import MoodTracker from "@/components/MoodTracker";
-import CommitGraph from "@/components/CommitGraph";
+import MonthlyHabitGrid from "@/components/MonthlyHabitGrid";
 import HabitsDashboard from "@/components/HabitsDashboard";
 import Challenge from "@/components/Challenge";
 import Summary from "@/components/Summary";
@@ -85,7 +85,7 @@ const Index = () => {
               <HabitGrid />
               <MoodTracker />
               <HabitsDashboard />
-              <CommitGraph />
+              <MonthlyHabitGrid />
             </div>
           </AnimatedTab>
 
