@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Gate from "./pages/Gate.tsx";
 
 const queryClient = new QueryClient();
 
@@ -14,6 +15,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+};
+
+const GateRoute = ({ children }: { children: React.ReactNode }) => {
+  const unlocked = localStorage.getItem("gateUnlocked") === "true";
+  if (!unlocked) return <Navigate to="/gate" replace />;
   return <>{children}</>;
 };
 
@@ -25,7 +32,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/gate" element={<Gate />} />
+            <Route path="/auth" element={<GateRoute><Auth /></GateRoute>} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

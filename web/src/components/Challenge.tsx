@@ -201,22 +201,20 @@ const Challenge = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setNewType("objective")}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs border transition-colors ${
-                    newType === "objective"
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs border transition-colors ${newType === "objective"
                       ? "bg-primary/20 border-primary/40 text-foreground"
                       : "bg-muted/20 border-border/30 text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   <Shield className="h-3.5 w-3.5" />
                   Objetivo
                 </button>
                 <button
                   onClick={() => setNewType("cleanup")}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs border transition-colors ${
-                    newType === "cleanup"
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs border transition-colors ${newType === "cleanup"
                       ? "bg-destructive/15 border-destructive/40 text-foreground"
                       : "bg-muted/20 border-border/30 text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   <Ban className="h-3.5 w-3.5" />
                   Limpeza
@@ -327,11 +325,10 @@ const Challenge = () => {
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleLogChallenge(challenge.id)}
                       disabled={logChallengeMutation.isPending || isCompletedToday}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-                        isCompletedToday
+                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${isCompletedToday
                           ? "bg-moss-light/80 text-background"
                           : "bg-primary text-primary-foreground hover:bg-primary/90"
-                      }`}
+                        }`}
                     >
                       {logChallengeMutation.isPending
                         ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -346,8 +343,8 @@ const Challenge = () => {
                           key={d.id}
                           onClick={() => setSelectedDifficulty(prev => ({ ...prev, [challenge.id]: d.id }))}
                           className={`rounded-lg px-3 py-1 text-xs border transition-colors ${selectedDifficulty[challenge.id] === d.id
-                              ? `${d.color} text-foreground`
-                              : "bg-muted/30 border-border/30 text-muted-foreground"
+                            ? `${d.color} text-foreground`
+                            : "bg-muted/30 border-border/30 text-muted-foreground"
                             }`}
                         >
                           {d.label}
