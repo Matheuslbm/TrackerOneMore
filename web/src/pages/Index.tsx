@@ -16,8 +16,13 @@ const tabs = [
   { id: "desafios", label: "Desafios" },
 ];
 
+const activeTabStorageKey = "activeTab";
+
 const Index = () => {
-  const [activeTab, setActiveTab] = useState("habitos");
+  const [activeTab, setActiveTab] = useState(() => {
+    const stored = localStorage.getItem(activeTabStorageKey);
+    return stored && tabs.some((t) => t.id === stored) ? stored : "resumo";
+  });
   const { signOut } = useAuth();
 
   return (
@@ -58,7 +63,10 @@ const Index = () => {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  localStorage.setItem(activeTabStorageKey, tab.id);
+                }}
                 className={`relative px-6 py-2.5 text-sm font-display font-semibold transition-all ${activeTab === tab.id
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground/70"
