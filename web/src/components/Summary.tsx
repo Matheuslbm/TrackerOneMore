@@ -1,25 +1,56 @@
 import { motion } from "framer-motion";
 import { Flame, Target, Trophy, TrendingUp, Zap, BarChart3, Loader2 } from "lucide-react";
-import { useDashboard } from "@/api/dashboardApi";
-import { useHabits } from "@/api/habitsApi";
+import { useDashboard, useHabitsPerformance } from "@/api/dashboardApi";
 
 const Summary = () => {
   const { data: dashboardData, isLoading: dashboardLoading } = useDashboard();
-  const { data: habitsData, isLoading: habitsLoading } = useHabits(1, 100);
+  const { data: performanceData, isLoading: performanceLoading } = useHabitsPerformance(undefined, undefined, 1);
 
-  const totalStreak = dashboardData?.totalStreaks || 0;
-  const avgConsistency = dashboardData?.consistency || 0;
-  const activeHabits = habitsData?.items || [];
-  const activeChallenges = dashboardData?.activeChallenges?.length || 0;
+  const habitSummaries = dashboardData?.habitSummaries ?? [];
+  const challengeSummaries = dashboardData?.activeChallenges ?? [];
 
-  // Transform habit data to streak format
-  const streaks = activeHabits.map((habit) => ({
-    name: habit.name,
-    streak: habit.currentStreak || 0,
-    best: Math.max(habit.currentStreak || 0, 10),
-  }));
+  const totalStreak = habitSummaries.reduce((acc, habit) => acc + habit.currentStreak, 0)
+    + challengeSummaries.reduce((acc, challenge) => acc + challenge.currentStreak, 0);
+  const avgConsistency = performanceData?.averageCompletionRate ?? 0;
 
-  if (dashboardLoading || habitsLoading) {
+  const streaks = habitSummaries.map((habit) => {
+    const target = Math.max(5, (Math.floor(habit.currentStreak / 5) + 1) * 5);
+
+    return {
+      name: habit.name,
+      streak: habit.currentStreak,
+      best: target,
+    };
+  });
+
+  const weeklyDays = (() => {
+    const startDate = performanceData?.period?.startDate;
+    if (!startDate) return [] as { label: string; height: number }[];
+
+    const start = new Date(`${startDate}T00:00:00`);
+    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const totalHabits = performanceData?.habitPerformances?.length ?? 0;
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+      const completedCount = performanceData?.habitPerformances?.reduce((sum, habit) => {
+        const log = habit.dailyLogs.find((l) => l.date === dateKey);
+        return sum + (log?.status === "Completed" ? 1 : 0);
+      }, 0) ?? 0;
+
+      const height = totalHabits > 0 ? (completedCount / totalHabits) * 100 : 0;
+
+      return {
+        label: dayNames[date.getDay()],
+        height,
+      };
+    });
+  })();
+
+  if (dashboardLoading || performanceLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -29,7 +60,6 @@ const Summary = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Hero streak */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
@@ -46,13 +76,12 @@ const Summary = () => {
         <p className="text-sm text-muted-foreground mt-1">Streaks Totais Combinados</p>
       </motion.div>
 
-      {/* Quick stats */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: "Hábitos Ativos", value: activeHabits.length.toString(), icon: Target, color: "text-primary" },
+          { label: "Hábitos Ativos", value: habitSummaries.length.toString(), icon: Target, color: "text-primary" },
           { label: "Consistência", value: `${Math.round(avgConsistency)}%`, icon: TrendingUp, color: "text-moss-light" },
-          { label: "Desafios Ativos", value: activeChallenges.toString(), icon: Zap, color: "text-accent" },
-          { label: "Emblemas", value: "1", icon: Trophy, color: "text-streak-fire" },
+          { label: "Desafios Ativos", value: challengeSummaries.length.toString(), icon: Zap, color: "text-accent" },
+          { label: "Dias Ativos", value: (dashboardData?.contributionData?.length ?? 0).toString(), icon: Trophy, color: "text-streak-fire" },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -70,7 +99,6 @@ const Summary = () => {
         ))}
       </div>
 
-      {/* Streak breakdown */}
       <div className="rounded-xl bg-muted/20 border border-border/30 p-5">
         <div className="flex items-center gap-2 mb-5">
           <Flame className="h-5 w-5 text-streak-fire" />
@@ -93,7 +121,6 @@ const Summary = () => {
         </div>
       </div>
 
-      {/* Motivational quote */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -106,23 +133,20 @@ const Summary = () => {
         <span className="mt-2 inline-block text-xs text-muted-foreground/60">+1</span>
       </motion.div>
 
-      {/* Weekly balance */}
       <div className="rounded-xl bg-muted/20 border border-border/30 p-5">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="h-5 w-5 text-primary" />
           <h3 className="font-display text-sm font-semibold text-foreground">Balanço Semanal</h3>
         </div>
         <div className="grid grid-cols-7 gap-2">
-          {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((day, i) => {
-            return (
-              <div key={day} className="flex flex-col items-center gap-2">
-                <div className="h-28 w-full rounded-lg bg-muted/30 flex items-end overflow-hidden">
-                  <div className="w-full rounded-t-md bg-primary/70" style={{ height: '0%' }} />
-                </div>
-                <span className="font-display text-[10px] text-muted-foreground">{day}</span>
+          {weeklyDays.map((day) => (
+            <div key={day.label} className="flex flex-col items-center gap-2">
+              <div className="h-28 w-full rounded-lg bg-muted/30 flex items-end overflow-hidden">
+                <div className="w-full rounded-t-md bg-primary/70" style={{ height: `${day.height}%` }} />
               </div>
-            );
-          })}
+              <span className="font-display text-[10px] text-muted-foreground">{day.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

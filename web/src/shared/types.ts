@@ -105,15 +105,32 @@ export interface LogMoodRequest {
 }
 
 // Dashboard Types
+export interface HabitSummaryResponse {
+    id: string;
+    name: string;
+    currentStreak: number;
+    isCompletedToday: boolean;
+}
+
+export interface ActiveChallengeSummaryResponse {
+    id: string;
+    title: string;
+    currentStreak: number;
+    targetEndDate: string;
+    daysRemaining: number;
+}
+
+export interface ContributionDataResponse {
+    date: string;
+    count: number;
+}
+
 export interface DashboardResponse {
-    userId: string;
-    userName: string;
-    userEmail: string;
-    todayMood: MoodResponse | null;
-    activeHabits: HabitResponse[];
-    activeChallenges: ChallengeResponse[];
-    totalStreaks: number;
-    consistency: number; // percentage 0-100
+    dailyGreeting: string;
+    moodLevel: number | null;
+    habitSummaries: HabitSummaryResponse[];
+    activeChallenges: ActiveChallengeSummaryResponse[];
+    contributionData: ContributionDataResponse[];
 }
 
 export interface DashboardSummaryResponse {
