@@ -50,7 +50,19 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:8080") // URLs de desenvolvimento
+        var allowedOrigins = new List<string>
+        {
+            "http://localhost:5173",
+            "http://localhost:8080"
+        };
+
+        var webAppOrigin = builder.Configuration["WebAppUrl"];
+        if (!string.IsNullOrWhiteSpace(webAppOrigin))
+        {
+            allowedOrigins.Add(webAppOrigin.TrimEnd('/'));
+        }
+
+        policy.WithOrigins(allowedOrigins.ToArray())
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
