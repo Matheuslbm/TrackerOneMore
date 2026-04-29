@@ -30,7 +30,7 @@ export function useActiveChallenges() {
         queryKey: [CHALLENGES_QUERY_KEY, 'active'],
         queryFn: async () => {
             const { data } = await api.get<ChallengeResponse[]>(
-                '/challenges?isActive=true'
+                '/challenges/active'
             );
             return data;
         },
@@ -88,11 +88,11 @@ export function useUpdateChallenge(challengeId: string) {
 }
 
 // Delete challenge
-export function useDeleteChallenge(challengeId: string) {
+export function useDeleteChallenge() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async () => {
+        mutationFn: async (challengeId: string) => {
             await api.delete(`/challenges/${challengeId}`);
         },
         onSuccess: () => {
@@ -106,12 +106,13 @@ export function useLogChallenge() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (logData: LogChallengeRequest) => {
+        mutationFn: async (logData: LogChallengeRequest & { challengeId: string }) => {
             const { data } = await api.post(
                 `/challenges/${logData.challengeId}/log`,
                 {
                     date: logData.date,
                     difficulty: logData.difficulty,
+                    survived: logData.survived,
                 }
             );
             return data;

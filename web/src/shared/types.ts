@@ -69,19 +69,17 @@ export interface ChallengeResponse {
 
 export interface CreateChallengeRequest {
     title: string;
-    startDate: string;
-    targetEndDate: string;
+    initialDaysDuration: number;
 }
 
 export interface UpdateChallengeRequest {
     title: string;
-    targetEndDate: string;
 }
 
 export interface LogChallengeRequest {
-    challengeId: string;
     date: string;
     difficulty: "Easy" | "Medium" | "Hard";
+    survived: boolean;
 }
 
 // Mood Types
